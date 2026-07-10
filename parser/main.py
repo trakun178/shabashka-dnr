@@ -120,48 +120,41 @@ def get_channel_updates():
                     forwarded_from = post['forward_from_chat'].get('title', 'Unknown')
                     print(f"  ↪️ Переслано из канала: {forwarded_from}")
                 
-                # Собираем все медиа
-                photo_urls = []
+                # Собираем медиа - ТОЛЬКО ОДНО САМОЕ БОЛЬШОЕ ФОТО
+                photo_url = None
                 has_media = False
                 
-                # Фото (может быть несколько)
+                # Фото - берем только последнее (самое большое разрешение)
                 if 'photo' in post:
                     has_media = True
                     photos = post['photo']
-                    print(f"  📷 Фото: {len(photos)} шт")
+                    print(f"  📷 Фото: {len(photos)} разрешений")
                     
-                    # Берем все фото в разном разрешении (или только самое большое)
-                    for i, photo in enumerate(photos):
-                        file_id = photo['file_id']
+                    # Берем ПОСЛЕДНЕЕ фото (самое большое)
+                    if photos:
+                        largest_photo = photos[-1]
+                        file_id = largest_photo['file_id']
                         photo_url = get_file_url(file_id)
                         if photo_url:
-                            photo_urls.append(photo_url)
-                            if i == 0:
-                                print(f"  📷 Фото URL: {photo_url[:60]}...")
+                            print(f"  📷 Фото URL (max): {photo_url[:60]}...")
                 
                 # Видео
                 if 'video' in post:
                     has_media = True
                     video = post['video']
                     file_id = video['file_id']
-                    video_url = get_file_url(file_id)
-                    if video_url:
-                        photo_urls.append(video_url)
-                        print(f"  🎥 Видео: {video_url[:60]}...")
+                    photo_url = get_file_url(file_id)
+                    if photo_url:
+                        print(f"  🎥 Видео: {photo_url[:60]}...")
                 
                 # Документ
                 if 'document' in post:
                     has_media = True
                     doc = post['document']
                     file_id = doc['file_id']
-                    doc_url = get_file_url(file_id)
-                    if doc_url:
-                        photo_urls.append(doc_url)
-                        print(f"  📄 Документ: {doc_url[:60]}...")
-                
-                # Преобразуем список фото в строку (JSON) для хранения
-                import json
-                photo_urls_json = json.dumps(photo_urls) if photo_urls else None
+                    photo_url = get_file_url(file_id)
+                    if photo_url:
+                        print(f"  📄 Документ: {photo_url[:60]}...")
                 
                 # Если есть текст ИЛИ медиа - сохраняем
                 if text or has_media:
@@ -175,14 +168,16 @@ def get_channel_updates():
                         'category': parse_category(text) if text else 'другое',
                         'city': parse_city(text) if text else 'Донецк',
                         'phone': extract_phone(text) if text else '',
-                        'photo_url': photo_urls_json,  # Сохраняем JSON массива URL
+                        'photo_url': photo_url,  # Сохраняем как СТРОКУ (не JSON!)
+                        'post_link': post_link,  # Добавляем ссылку
+                        'forwarded_from': forwarded_from,  # Добавляем кто переслал
                         'created_at': datetime.now().isoformat()
                     }
                     
                     new_ads.append(ad)
                     max_id = message_id
                     print(f"  ✅ Добавлено объявление #{message_id}")
-                    print(f"     Текст: {len(text)} символов, Медиа: {len(photo_urls)} шт")
+                    print(f"     Текст: {len(text)} символов, Медиа: {'есть' if photo_url else 'нет'}")
                 else:
                     print(f"  ⚠️ Пропущено: нет текста и медиа")
                     skipped_count += 1
