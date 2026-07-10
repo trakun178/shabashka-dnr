@@ -77,10 +77,12 @@
         min-width: 200px;
       }
 
-      .ads-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      .ads-list {
+        display: flex;
+        flex-direction: column;
         gap: 1.5rem;
+        max-width: 800px;
+        margin: 0 auto;
       }
 
       .ad-card {
@@ -91,18 +93,21 @@
         transition:
           transform 0.2s,
           box-shadow 0.2s;
+        width: 100%;
+        max-width: 800px;
       }
 
       .ad-card:hover {
-        transform: translateY(-4px);
+        transform: translateY(-2px);
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
       }
 
       .ad-image {
         width: 100%;
-        height: 200px;
-        object-fit: cover;
-        background: #eee;
+        max-height: 600px;
+        object-fit: contain;
+        background: #f5f5f5;
+        display: block;
       }
 
       .ad-content {
@@ -318,7 +323,7 @@
         />
       </div>
 
-      <div id="adsContainer" class="ads-grid">
+      <div id="adsContainer" class="ads-list">
         <div class="loading">Загрузка объявлений...</div>
       </div>
     </div>
@@ -327,7 +332,7 @@
       <div class="footer-content">
         <div class="social-links">
           <a
-            href="https://vk.com/shabashka_dnr"
+            href="https://vk.com/dnrsabbath"
             target="_blank"
             rel="noopener noreferrer"
             title="ВКонтакте"
@@ -353,7 +358,7 @@
         </div>
         <p class="footer-text">
           © 2026 Шабашка DNR - Услуги и объявления<br />
-          Донецк, Макеевка, Горловка
+          Донецк, Макеевка, Горловка, Мариуполь
         </p>
       </div>
     </footer>
@@ -427,25 +432,44 @@
         }
 
         container.innerHTML = ads
-          .map(
-            (ad) => `
-                <div class="ad-card">
-                    ${ad.photo_url ? `<img src="${ad.photo_url}" class="ad-image" alt="${ad.title || "Объявление"}">` : ""}
-                    <div class="ad-content">
-                        <span class="ad-category">${ad.category || "другое"}</span>
-                        <h3 class="ad-title">${ad.title || "Без названия"}</h3>
-                        <p class="ad-description">${ad.description || "Нет описания"}</p>
-                        <div class="ad-meta">
-                            <span>📍 ${ad.city || "Донецк"}</span>
-                            ${ad.phone ? `<span>📞 ${ad.phone}</span>` : ""}
-                            ${ad.forwarded_from ? `<span>️ ${ad.forwarded_from}</span>` : ""}
-                            <span>🕐 ${new Date(ad.created_at).toLocaleString("ru-RU")}</span>
-                        </div>
-                        ${ad.post_link ? `<a href="${ad.post_link}" target="_blank" rel="noopener noreferrer" class="ad-link">Открыть в Telegram</a>` : ""}
+          .map((ad) => {
+            // Скрываем "Объявление #..." - показываем только если есть реальный текст
+            let title = ad.title;
+            if (
+              !title ||
+              title.startsWith("Объявление #") ||
+              title.length < 10
+            ) {
+              title =
+                ad.description && ad.description.length > 100
+                  ? ad.description.substring(0, 100) + "..."
+                  : ad.description || "Без описания";
+            }
+
+            // Описание - полный текст
+            let description = ad.description || "";
+            if (description.length > 500) {
+              description = description.substring(0, 500) + "...";
+            }
+
+            return `
+            <div class="ad-card">
+                ${ad.photo_url ? `<img src="${ad.photo_url}" class="ad-image" alt="${title}">` : ""}
+                <div class="ad-content">
+                    <span class="ad-category">${ad.category || "другое"}</span>
+                    <h3 class="ad-title">${title}</h3>
+                    <p class="ad-description">${description}</p>
+                    <div class="ad-meta">
+                        <span>📍 ${ad.city || "Донецк"}</span>
+                        ${ad.phone ? `<span>📞 ${ad.phone}</span>` : ""}
+                        ${ad.forwarded_from ? `<span>️ ${ad.forwarded_from}</span>` : ""}
+                        <span>🕐 ${new Date(ad.created_at).toLocaleString("ru-RU")}</span>
                     </div>
+                    ${ad.post_link ? `<a href="${ad.post_link}" target="_blank" rel="noopener noreferrer" class="ad-link">Открыть в Telegram</a>` : ""}
                 </div>
-            `,
-          )
+            </div>
+        `;
+          })
           .join("");
       }
 
