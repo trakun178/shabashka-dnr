@@ -6,12 +6,12 @@ BOT_TOKEN = os.environ.get('BOT_TOKEN')
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
 SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
 
-print(f" Подключение к Supabase...")
+print(f"🔗 Подключение к Supabase...")
 print(f"URL: {SUPABASE_URL}")
 print(f"Key length: {len(SUPABASE_KEY) if SUPABASE_KEY else 0}")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    print(" SUPABASE_URL или SUPABASE_KEY не установлены!")
+    print("❌ SUPABASE_URL или SUPABASE_KEY не установлены!")
     exit(1)
 
 HEADERS = {
@@ -35,6 +35,20 @@ def test_connection():
         print(f"❌ Ошибка: {e}")
         return False
 
+def get_file_url(file_id):
+    """Получаем URL файла по file_id"""
+    try:
+        file_url = f'https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}'
+        file_response = requests.get(file_url)
+        file_data = file_response.json()
+        
+        if file_data.get('ok'):
+            file_path = file_data['result']['file_path']
+            return f'https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}'
+    except Exception as e:
+        print(f"  ⚠️ Ошибка получения файла: {e}")
+    return None
+
 def get_channel_updates():
     print("📥 Получаем последнее состояние парсера...")
     
@@ -49,7 +63,7 @@ def get_channel_updates():
     last_id = data[0]['last_message_id'] if data else 0
     print(f"Последний message_id: {last_id}")
     
-    print(f" Запрашиваем обновления из канала...")
+    print(f"📡 Запрашиваем обновления из канала...")
     telegram_url = f'https://api.telegram.org/bot{BOT_TOKEN}/getUpdates'
     params = {
         'offset': last_id + 1,
@@ -70,11 +84,10 @@ def get_channel_updates():
         
         new_ads = []
         max_id = last_id
-        skipped_no_text = 0
+        skipped_count = 0
         
         for update in results:
             print(f"\n🔍 Обрабатываем обновление...")
-            print(f" Keys в update: {list(update.keys())}")
             
             if 'channel_post' in update:
                 post = update['channel_post']
@@ -86,45 +99,72 @@ def get_channel_updates():
                 text = post.get('text', '')
                 
                 # Если текста нет, пробуем взять caption
-                if not text:
-                    if 'caption' in post:
-                        text = post['caption']
-                        print(f"  📝 Взято из caption (длина: {len(text)})")
-                    else:
-                        print(f"  ️ Нет текста или caption")
+                if not text and 'caption' in post:
+                    text = post['caption']
+                    print(f"  📝 Взято из caption (длина: {len(text)})")
                 
-                # Проверяем есть ли медиа
+                # Ссылка на пост в канале
+                channel_username = post.get('chat', {}).get('username', 'dnrsabbath')
+                post_link = f"https://t.me/{channel_username}/{message_id}"
+                print(f"  🔗 Ссылка: {post_link}")
+                
+                # Переслано от
+                forwarded_from = None
+                if 'forward_from' in post:
+                    sender = post['forward_from']
+                    forwarded_from = sender.get('first_name', '') + ' ' + sender.get('last_name', '')
+                    if sender.get('username'):
+                        forwarded_from += f" (@{sender['username']})"
+                    print(f"  ↪️ Переслано от: {forwarded_from.strip()}")
+                elif 'forward_from_chat' in post:
+                    forwarded_from = post['forward_from_chat'].get('title', 'Unknown')
+                    print(f"  ↪️ Переслано из канала: {forwarded_from}")
+                
+                # Собираем все медиа
+                photo_urls = []
                 has_media = False
-                photo_url = None
                 
+                # Фото (может быть несколько)
                 if 'photo' in post:
                     has_media = True
-                    print(f"  📷 Есть фото")
-                    # Получаем file_id самого большого фото
                     photos = post['photo']
-                    file_id = photos[-1]['file_id']
+                    print(f"  📷 Фото: {len(photos)} шт")
                     
-                    # Получаем ссылку на файл
-                    file_url = f'https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}'
-                    file_response = requests.get(file_url)
-                    file_data = file_response.json()
-                    
-                    if file_data.get('ok'):
-                        file_path = file_data['result']['file_path']
-                        photo_url = f'https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}'
-                        print(f"  📷 Фото URL: {photo_url[:50]}...")
+                    # Берем все фото в разном разрешении (или только самое большое)
+                    for i, photo in enumerate(photos):
+                        file_id = photo['file_id']
+                        photo_url = get_file_url(file_id)
+                        if photo_url:
+                            photo_urls.append(photo_url)
+                            if i == 0:
+                                print(f"  📷 Фото URL: {photo_url[:60]}...")
                 
+                # Видео
                 if 'video' in post:
                     has_media = True
-                    print(f"  🎥 Есть видео")
+                    video = post['video']
+                    file_id = video['file_id']
+                    video_url = get_file_url(file_id)
+                    if video_url:
+                        photo_urls.append(video_url)
+                        print(f"  🎥 Видео: {video_url[:60]}...")
                 
+                # Документ
                 if 'document' in post:
                     has_media = True
-                    print(f"  📄 Есть документ")
+                    doc = post['document']
+                    file_id = doc['file_id']
+                    doc_url = get_file_url(file_id)
+                    if doc_url:
+                        photo_urls.append(doc_url)
+                        print(f"  📄 Документ: {doc_url[:60]}...")
+                
+                # Преобразуем список фото в строку (JSON) для хранения
+                import json
+                photo_urls_json = json.dumps(photo_urls) if photo_urls else None
                 
                 # Если есть текст ИЛИ медиа - сохраняем
                 if text or has_media:
-                    # Если нет текста, но есть медиа - создаем заголовок
                     title = text[:100] if text else f"Объявление #{message_id}"
                     description = text if text else "Объявление с медиа файлом"
                     
@@ -135,25 +175,27 @@ def get_channel_updates():
                         'category': parse_category(text) if text else 'другое',
                         'city': parse_city(text) if text else 'Донецк',
                         'phone': extract_phone(text) if text else '',
-                        'photo_url': photo_url,
+                        'photo_url': photo_urls_json,  # Сохраняем JSON массива URL
                         'created_at': datetime.now().isoformat()
                     }
                     
                     new_ads.append(ad)
                     max_id = message_id
                     print(f"  ✅ Добавлено объявление #{message_id}")
+                    print(f"     Текст: {len(text)} символов, Медиа: {len(photo_urls)} шт")
                 else:
                     print(f"  ⚠️ Пропущено: нет текста и медиа")
-                    skipped_no_text += 1
+                    skipped_count += 1
                     if message_id > max_id:
                         max_id = message_id
             else:
-                print(f"  ⚠️ Нет 'channel_post' в update!")
+                print(f"  ⚠️ Пропущено (не channel_post)")
+                skipped_count += 1
         
         print(f"\n📊 Статистика:")
         print(f"  Всего обновлений: {len(results)}")
         print(f"  Новых объявлений: {len(new_ads)}")
-        print(f"  Пропущено (нет текста и медиа): {skipped_no_text}")
+        print(f"  Пропущено: {skipped_count}")
         
         if new_ads:
             print(f"\n💾 Сохраняем {len(new_ads)} объявлений...")
@@ -177,7 +219,7 @@ def get_channel_updates():
             if response.status_code == 200:
                 print(f"\n🎉 Готово! Добавлено {len(new_ads)} объявлений")
             else:
-                print(f" Ошибка обновления состояния: {response.status_code}")
+                print(f"⚠️ Ошибка обновления состояния: {response.status_code}")
         else:
             print("\nℹ️ Новых объявлений нет")
             
@@ -188,6 +230,8 @@ def get_channel_updates():
 
 def extract_phone(text):
     import re
+    if not text:
+        return ''
     phones = re.findall(r'[\+]?[0-9\s\-\(\)]{10,20}', text)
     if phones:
         return phones[0].strip()
