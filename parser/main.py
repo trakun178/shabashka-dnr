@@ -108,17 +108,26 @@ def get_channel_updates():
                 post_link = f"https://t.me/{channel_username}/{message_id}"
                 print(f"  🔗 Ссылка: {post_link}")
                 
-                # Переслано от
+                # Переслано от - ИСПРАВЛЕНО
                 forwarded_from = None
                 if 'forward_from' in post:
+                    # Переслано от пользователя
                     sender = post['forward_from']
                     forwarded_from = sender.get('first_name', '') + ' ' + sender.get('last_name', '')
                     if sender.get('username'):
                         forwarded_from += f" (@{sender['username']})"
-                    print(f"  ↪️ Переслано от: {forwarded_from.strip()}")
+                    print(f"  ↪️ Переслано от пользователя: {forwarded_from.strip()}")
                 elif 'forward_from_chat' in post:
-                    forwarded_from = post['forward_from_chat'].get('title', 'Unknown')
+                    # Переслано из канала
+                    chat = post['forward_from_chat']
+                    forwarded_from = chat.get('title', 'Unknown')
+                    if chat.get('username'):
+                        forwarded_from += f" (@{chat['username']})"
                     print(f"  ↪️ Переслано из канала: {forwarded_from}")
+                elif 'forward_sender_name' in post:
+                    # Переслано от пользователя (скрытый профиль)
+                    forwarded_from = post['forward_sender_name']
+                    print(f"  ↪️ Переслано от: {forwarded_from}")
                 
                 # Собираем медиа - ТОЛЬКО ОДНО САМОЕ БОЛЬШОЕ ФОТО
                 photo_url = None
@@ -128,7 +137,7 @@ def get_channel_updates():
                 if 'photo' in post:
                     has_media = True
                     photos = post['photo']
-                    print(f"  📷 Фото: {len(photos)} разрешений")
+                    print(f"   Фото: {len(photos)} разрешений")
                     
                     # Берем ПОСЛЕДНЕЕ фото (самое большое)
                     if photos:
@@ -168,9 +177,9 @@ def get_channel_updates():
                         'category': parse_category(text) if text else 'другое',
                         'city': parse_city(text) if text else 'Донецк',
                         'phone': extract_phone(text) if text else '',
-                        'photo_url': photo_url,  # Сохраняем как СТРОКУ (не JSON!)
-                        'post_link': post_link,  # Добавляем ссылку
-                        'forwarded_from': forwarded_from,  # Добавляем кто переслал
+                        'photo_url': photo_url,
+                        'post_link': post_link,
+                        'forwarded_from': forwarded_from,
                         'created_at': datetime.now().isoformat()
                     }
                     
@@ -178,6 +187,8 @@ def get_channel_updates():
                     max_id = message_id
                     print(f"  ✅ Добавлено объявление #{message_id}")
                     print(f"     Текст: {len(text)} символов, Медиа: {'есть' if photo_url else 'нет'}")
+                    if forwarded_from:
+                        print(f"     Переслано от: {forwarded_from}")
                 else:
                     print(f"  ⚠️ Пропущено: нет текста и медиа")
                     skipped_count += 1
@@ -187,7 +198,7 @@ def get_channel_updates():
                 print(f"  ⚠️ Пропущено (не channel_post)")
                 skipped_count += 1
         
-        print(f"\n📊 Статистика:")
+        print(f"\n Статистика:")
         print(f"  Всего обновлений: {len(results)}")
         print(f"  Новых объявлений: {len(new_ads)}")
         print(f"  Пропущено: {skipped_count}")
@@ -245,6 +256,7 @@ def parse_category(text):
         'строительство': ['строитель', 'кладка', 'бетон', 'фундамент'],
         'грузчики': ['грузчик', 'вывоз', 'переезд', 'разгрузка'],
         'уборка': ['уборка', 'клининг', 'мойка'],
+        'окна': ['окон', 'окна', 'оконный', 'москитн'],
     }
     
     for category, keywords in categories.items():
