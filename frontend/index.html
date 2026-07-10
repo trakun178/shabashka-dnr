@@ -4,10 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Шабашка DNR - Объявления Донецк, Макеевка</title>
+
+    <!-- Supabase библиотека -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Иконки Font Awesome -->
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
+
     <style>
       * {
         margin: 0;
@@ -31,14 +37,6 @@
         padding: 2rem 1rem;
         text-align: center;
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-      }
-
-      .logo {
-        max-width: 200px;
-        height: auto;
-        margin: 0 auto 1rem;
-        display: block;
-        border-radius: 12px;
       }
 
       header h1 {
@@ -166,7 +164,6 @@
         background: #5568d3;
       }
 
-      /* Рекламные блоки */
       .ad-banner {
         background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
         color: white;
@@ -198,7 +195,6 @@
         transform: scale(1.05);
       }
 
-      /* Футер */
       footer {
         background: #2d3748;
         color: white;
@@ -272,24 +268,20 @@
   </head>
   <body>
     <header>
-      <!-- Закомментируйте или удалите если нет логотипа -->
-      <!-- 
-    <img src="https://krftmuyrshvgbdsstidf.supabase.co/storage/v1/object/public/logos/logo.gif" 
-         alt="Шабашка DNR" 
-         class="logo"
-         onerror="this.style.display='none'">
-    -->
-
       <h1>🔧 Шабашка DNR</h1>
       <p>Объявления Донецк, Макеевка, Горловка, Мариуполь</p>
     </header>
 
     <div class="container">
-      <!-- Рекламный блок -->
       <div class="ad-banner" id="adBanner" style="display: none">
-        <h3>Разместите свою рекламу здесь!</h3>
+        <h3>📢 Разместите свою рекламу здесь!</h3>
         <p>Ваше объявление увидят тысячи людей</p>
-        <a href="https://t.me/dnrsabbath" target="_blank">Разместить рекламу</a>
+        <a
+          href="https://t.me/dnrsabbath"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Разместить рекламу</a
+        >
       </div>
 
       <div class="filters">
@@ -310,7 +302,6 @@
           <option value="Донецк">Донецк</option>
           <option value="Макеевка">Макеевка</option>
           <option value="Горловка">Горловка</option>
-          <option value="Горловка">Мариуполь</option>
         </select>
 
         <input
@@ -329,19 +320,34 @@
     <footer>
       <div class="footer-content">
         <div class="social-links">
-          <a href="https://vk.com/dnrsabbath" target="_blank" title="ВКонтакте">
+          <a
+            href="https://vk.com/shabashka_dnr"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="ВКонтакте"
+          >
             <i class="fab fa-vk"></i>
           </a>
-          <a href="https://t.me/dnrsabbath" target="_blank" title="Telegram">
+          <a
+            href="https://t.me/dnrsabbath"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Telegram"
+          >
             <i class="fab fa-telegram-plane"></i>
           </a>
-          <a href="https://max.ru" target="_blank" title="MAX">
+          <a
+            href="https://max.kz"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="MAX"
+          >
             <i class="fas fa-briefcase"></i>
           </a>
         </div>
         <p class="footer-text">
           © 2026 Шабашка DNR - Услуги и объявления<br />
-          Донецк, Макеевка, Горловка, Мариуполь
+          Донецк, Макеевка, Горловка
         </p>
       </div>
     </footer>
@@ -371,8 +377,6 @@
 
           allAds = data || [];
           renderAds(allAds);
-
-          // Показываем рекламный блок если есть реклама
           checkPaidAds();
         } catch (error) {
           console.error("Ошибка загрузки:", error);
@@ -393,13 +397,12 @@
             .single();
 
           if (data) {
-            const { data } = await supabaseClient
-              .from("paid_ads")
-              .select("*")
-              .eq("active", true)
-              .order("priority", { ascending: false })
-              .limit(1)
-              .single();
+            const banner = document.getElementById("adBanner");
+            banner.innerHTML = `
+                        <h3>${data.title}</h3>
+                        <p>${data.description}</p>
+                        <a href="${data.link}" target="_blank" rel="noopener noreferrer">${data.button_text || "Подробнее"}</a>
+                    `;
             banner.style.display = "block";
           }
         } catch (error) {
@@ -421,18 +424,18 @@
           .map(
             (ad) => `
                 <div class="ad-card">
-                    ${ad.photo_url ? `<img src="${ad.photo_url}" class="ad-image" alt="${ad.title}">` : ""}
+                    ${ad.photo_url ? `<img src="${ad.photo_url}" class="ad-image" alt="${ad.title || "Объявление"}">` : ""}
                     <div class="ad-content">
                         <span class="ad-category">${ad.category || "другое"}</span>
                         <h3 class="ad-title">${ad.title || "Без названия"}</h3>
                         <p class="ad-description">${ad.description || "Нет описания"}</p>
                         <div class="ad-meta">
                             <span>📍 ${ad.city || "Донецк"}</span>
-                            ${ad.phone ? `<span> ${ad.phone}</span>` : ""}
+                            ${ad.phone ? `<span>📞 ${ad.phone}</span>` : ""}
                             ${ad.forwarded_from ? `<span>️ ${ad.forwarded_from}</span>` : ""}
                             <span>🕐 ${new Date(ad.created_at).toLocaleString("ru-RU")}</span>
                         </div>
-                        ${ad.post_link ? `<a href="${ad.post_link}" target="_blank" class="ad-link">Открыть в Telegram</a>` : ""}
+                        ${ad.post_link ? `<a href="${ad.post_link}" target="_blank" rel="noopener noreferrer" class="ad-link">Открыть в Telegram</a>` : ""}
                     </div>
                 </div>
             `,
@@ -483,8 +486,5 @@
       // Загрузка при старте
       loadAds();
     </script>
-
-    <!-- Supabase библиотека -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   </body>
 </html>
