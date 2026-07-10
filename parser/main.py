@@ -69,11 +69,11 @@ def get_channel_updates():
     params = {
         'offset': last_id + 1,
         'limit': 100,
-        'timeout': 30
+        'timeout': 10
     }
     
     try:
-        response = requests.get(telegram_url, params=params, timeout=30)
+        response = requests.get(telegram_url, params=params, timeout=60)
         data = response.json()
         
         if not data.get('ok'):
