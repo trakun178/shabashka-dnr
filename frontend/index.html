@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Шабашка DNR - Объявления Донецк, Макеевка</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabaseClient/supabaseClient-js@2"></script>
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
@@ -275,7 +275,7 @@
     <header>
       <!-- Логотип GIF -->
       <img
-        src="https://krftmuyrshvgbdsstidf.supabase.co/storage/v1/object/public/logos/logo.gif"
+        src="https://krftmuyrshvgbdsstidf.supabaseClient.co/storage/v1/object/public/logos/logo.gif"
         alt="Шабашка DNR"
         class="logo"
         onerror="this.style.display = 'none'"
@@ -311,6 +311,7 @@
           <option value="Донецк">Донецк</option>
           <option value="Макеевка">Макеевка</option>
           <option value="Горловка">Горловка</option>
+          <option value="Горловка">Мариуполь</option>
         </select>
 
         <input
@@ -354,9 +355,9 @@
       // Supabase конфигурация
       const SUPABASE_URL = "https://krftmuyrshvgbdsstidf.supabase.co";
       const SUPABASE_ANON_KEY =
-        "sb_publishable_l6VMNPTJmOS3o8G2g99SRQ_cwMHGzFr"; // ЗАМЕНИТЕ!
+        "sb_publishable_16VMNPTJmOS3o8G2g99SRQ_cwMHGzFr";
 
-      const supabase = window.supabase.createClient(
+      const supabaseClient = window.supabase.createClient(
         SUPABASE_URL,
         SUPABASE_ANON_KEY,
       );
@@ -366,7 +367,7 @@
       // Загрузка объявлений
       async function loadAds() {
         try {
-          const { data, error } = await supabase
+          const { data, error } = await supabaseClient
             .from("ads")
             .select("*")
             .order("created_at", { ascending: false });
@@ -388,7 +389,7 @@
       // Проверка платной рекламы
       async function checkPaidAds() {
         try {
-          const { data } = await supabase
+          const { data } = await supabaseClient
             .from("paid_ads")
             .select("*")
             .eq("active", true)
@@ -397,12 +398,13 @@
             .single();
 
           if (data) {
-            const banner = document.getElementById("adBanner");
-            banner.innerHTML = `
-                        <h3>${data.title}</h3>
-                        <p>${data.description}</p>
-                        <a href="${data.link}" target="_blank">${data.button_text || "Подробнее"}</a>
-                    `;
+            const { data } = await supabaseClient
+              .from("paid_ads")
+              .select("*")
+              .eq("active", true)
+              .order("priority", { ascending: false })
+              .limit(1)
+              .single();
             banner.style.display = "block";
           }
         } catch (error) {
