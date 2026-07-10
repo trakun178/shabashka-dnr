@@ -29,7 +29,7 @@ def test_connection():
             print("✅ Успешно подключились к Supabase!")
             return True
         else:
-            print(f"❌ Ошибка подключения: {response.status_code}")
+            print(f" Ошибка подключения: {response.status_code}")
             return False
     except Exception as e:
         print(f"❌ Ошибка: {e}")
@@ -108,17 +108,15 @@ def get_channel_updates():
                 post_link = f"https://t.me/{channel_username}/{message_id}"
                 print(f"  🔗 Ссылка: {post_link}")
                 
-                # Переслано от - ИСПРАВЛЕНО
+                # Переслано от
                 forwarded_from = None
                 if 'forward_from' in post:
-                    # Переслано от пользователя
                     sender = post['forward_from']
                     forwarded_from = sender.get('first_name', '') + ' ' + sender.get('last_name', '')
                     if sender.get('username'):
                         forwarded_from += f" (@{sender['username']})"
-                    print(f"  ↪️ Переслано от пользователя: {forwarded_from.strip()}")
+                    print(f"  ↪️ Переслано от: {forwarded_from.strip()}")
                 elif 'forward_from_chat' in post:
-                    # Переслано из канала
                     chat = post['forward_from_chat']
                     forwarded_from = chat.get('title', 'Unknown')
                     if chat.get('username'):
@@ -126,9 +124,9 @@ def get_channel_updates():
                     print(f"  ↪️ Переслано из канала: {forwarded_from}")
                 elif 'forward_sender_name' in post:
                     forwarded_from = post['forward_sender_name']
-                    # Если это эмодзи - заменяем на "Скрытый профиль"
-                    if forwarded_from and not any(c.isalpha() for c in forwarded_from):
-                      forwarded_from = "Скрытый профиль"
+                    # Если это эмодзи или пустая строка
+                    if not forwarded_from or not any(c.isalpha() for c in forwarded_from):
+                        forwarded_from = "Скрытый профиль"
                     print(f"  ↪️ Переслано от: {forwarded_from}")
                 
                 # Собираем медиа - ТОЛЬКО ОДНО САМОЕ БОЛЬШОЕ ФОТО
@@ -139,9 +137,8 @@ def get_channel_updates():
                 if 'photo' in post:
                     has_media = True
                     photos = post['photo']
-                    print(f"   Фото: {len(photos)} разрешений")
+                    print(f"  📷 Фото: {len(photos)} разрешений")
                     
-                    # Берем ПОСЛЕДНЕЕ фото (самое большое)
                     if photos:
                         largest_photo = photos[-1]
                         file_id = largest_photo['file_id']
@@ -156,7 +153,7 @@ def get_channel_updates():
                     file_id = video['file_id']
                     photo_url = get_file_url(file_id)
                     if photo_url:
-                        print(f"  🎥 Видео: {photo_url[:60]}...")
+                        print(f"   Видео: {photo_url[:60]}...")
                 
                 # Документ
                 if 'document' in post:
@@ -200,17 +197,17 @@ def get_channel_updates():
                 print(f"  ⚠️ Пропущено (не channel_post)")
                 skipped_count += 1
         
-        print(f"\n Статистика:")
+        print(f"\n📊 Статистика:")
         print(f"  Всего обновлений: {len(results)}")
         print(f"  Новых объявлений: {len(new_ads)}")
         print(f"  Пропущено: {skipped_count}")
         
         if new_ads:
             print(f"\n💾 Сохраняем {len(new_ads)} объявлений...")
-            # Используем upsert чтобы избежать дубликатов
+            # Используем upsert с игнорированием дубликатов
             url = f"{SUPABASE_URL}/rest/v1/ads"
             headers_upsert = HEADERS.copy()
-            headers_upsert["Prefer"] = "resolution=merge-duplicates,return=representation"
+            headers_upsert["Prefer"] = "resolution=ignore-duplicates,return=representation"
             response = requests.post(url, headers=headers_upsert, json=new_ads)
             
             if response.status_code in [200, 201]:
