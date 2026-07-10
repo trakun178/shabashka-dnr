@@ -1,0 +1,8 @@
+parser/.env
+frontend/.env.local
+frontend/.env
+*.pyc
+__pycache__/
+node_modules/
+.next/
+.DS_Store

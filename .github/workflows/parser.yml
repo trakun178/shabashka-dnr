@@ -1,0 +1,32 @@
+name: Telegram Parser
+
+on:
+  schedule:
+    - cron: "*/15 * * * *" # Каждые 15 минут
+  workflow_dispatch: # Ручной запуск
+
+jobs:
+  parse:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          cd parser
+          pip install -r requirements.txt
+
+      - name: Run parser
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          cd parser
+          python main.py
