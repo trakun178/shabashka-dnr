@@ -125,8 +125,10 @@ def get_channel_updates():
                         forwarded_from += f" (@{chat['username']})"
                     print(f"  ↪️ Переслано из канала: {forwarded_from}")
                 elif 'forward_sender_name' in post:
-                    # Переслано от пользователя (скрытый профиль)
                     forwarded_from = post['forward_sender_name']
+                    # Если это эмодзи - заменяем на "Скрытый профиль"
+                    if forwarded_from and not any(c.isalpha() for c in forwarded_from):
+                      forwarded_from = "Скрытый профиль"
                     print(f"  ↪️ Переслано от: {forwarded_from}")
                 
                 # Собираем медиа - ТОЛЬКО ОДНО САМОЕ БОЛЬШОЕ ФОТО
@@ -205,7 +207,7 @@ def get_channel_updates():
         
         if new_ads:
             print(f"\n💾 Сохраняем {len(new_ads)} объявлений...")
-            # Используем UPSERT чтобы избежать дубликатов
+            # Используем upsert чтобы избежать дубликатов
             url = f"{SUPABASE_URL}/rest/v1/ads"
             headers_upsert = HEADERS.copy()
             headers_upsert["Prefer"] = "resolution=merge-duplicates,return=representation"
