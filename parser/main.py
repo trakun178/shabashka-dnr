@@ -1,6 +1,5 @@
 import os
 import requests
-from supabase import create_client
 from datetime import datetime
 
 # Telegram Bot
@@ -11,16 +10,40 @@ CHANNEL = '@dnrsabbath'
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
 SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
 
-print(f" Подключение к Supabase...")
+print(f"🔗 Подключение к Supabase...")
 print(f"URL: {SUPABASE_URL}")
+print(f"Key length: {len(SUPABASE_KEY) if SUPABASE_KEY else 0}")
 print(f"Key starts with: {SUPABASE_KEY[:20] if SUPABASE_KEY else 'None'}...")
 
-try:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    print("✅ Успешно подключились к Supabase!")
-except Exception as e:
-    print(f"❌ Ошибка подключения: {e}")
+# Проверяем что ключи есть
+if not SUPABASE_URL or not SUPABASE_KEY:
+    print("❌ SUPABASE_URL или SUPABASE_KEY не установлены!")
     exit(1)
+
+# Используем REST API напрямую вместо библиотеки supabase
+HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "return=representation"
+}
+
+def test_connection():
+    """Тестируем подключение к Supabase"""
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/parser_state"
+        response = requests.get(url, headers=HEADERS, timeout=10)
+        
+        if response.status_code == 200:
+            print("✅ Успешно подключились к Supabase!")
+            return True
+        else:
+            print(f"❌ Ошибка подключения: {response.status_code}")
+            print(f"Response: {response.text}")
+            return False
+    except Exception as e:
+        print(f"❌ Ошибка: {e}")
+        return False
 
 def get_channel_updates():
     """Получаем новые сообщения из канала"""
@@ -28,20 +51,21 @@ def get_channel_updates():
     print("📥 Получаем последнее состояние парсера...")
     
     # Получаем последний ID из базы
-    try:
-        state = supabase.table('parser_state').select('*').eq('id', 1).execute()
-        last_id = state.data[0]['last_message_id'] if state.data else 0
-        print(f"Последний message_id: {last_id}")
-    except Exception as e:
-        print(f"❌ Ошибка чтения parser_state: {e}")
-        # Создаем таблицу если нет
-        print("📝 Создаем таблицу parser_state...")
-        supabase.table('parser_state').insert({'id': 1, 'last_message_id': 0}).execute()
-        last_id = 0
+    url = f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1"
+    response = requests.get(url, headers=HEADERS)
+    
+    if response.status_code != 200:
+        print(f"❌ Ошибка чтения parser_state: {response.status_code}")
+        print(f"Response: {response.text}")
+        return
+    
+    data = response.json()
+    last_id = data[0]['last_message_id'] if data else 0
+    print(f"Последний message_id: {last_id}")
     
     # Запрашиваем обновления через Bot API
-    print(f" Запрашиваем обновления из канала...")
-    url = f'https://api.telegram.org/bot{BOT_TOKEN}/getUpdates'
+    print(f"📨 Запрашиваем обновления из канала...")
+    telegram_url = f'https://api.telegram.org/bot{BOT_TOKEN}/getUpdates'
     params = {
         'offset': last_id + 1,
         'limit': 100,
@@ -49,11 +73,11 @@ def get_channel_updates():
     }
     
     try:
-        response = requests.get(url, params=params, timeout=30)
+        response = requests.get(telegram_url, params=params, timeout=30)
         data = response.json()
         
         if not data.get('ok'):
-            print(f"❌ Telegram API error: {data}")
+            print(f" Telegram API error: {data}")
             return
         
         results = data.get('result', [])
@@ -63,7 +87,6 @@ def get_channel_updates():
         max_id = last_id
         
         for update in results:
-            # Проверяем, что это сообщение из канала
             if 'channel_post' in update:
                 post = update['channel_post']
                 message_id = post['message_id']
@@ -90,20 +113,28 @@ def get_channel_updates():
         # Сохраняем в базу
         if new_ads:
             print(f"\n💾 Сохраняем {len(new_ads)} объявлений...")
-            try:
-                supabase.table('ads').insert(new_ads).execute()
+            url = f"{SUPABASE_URL}/rest/v1/ads"
+            response = requests.post(url, headers=HEADERS, json=new_ads)
+            
+            if response.status_code in [200, 201]:
                 print("✅ Объявления сохранены!")
-            except Exception as e:
-                print(f"❌ Ошибка сохранения ads: {e}")
+            else:
+                print(f"❌ Ошибка сохранения: {response.status_code}")
+                print(f"Response: {response.text}")
             
             # Обновляем состояние
             print("🔄 Обновляем состояние парсера...")
-            supabase.table('parser_state').update({
+            url = f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1"
+            update_data = {
                 'last_message_id': max_id,
                 'updated_at': datetime.now().isoformat()
-            }).eq('id', 1).execute()
+            }
+            response = requests.patch(url, headers=HEADERS, json=update_data)
             
-            print(f"\n🎉 Готово! Добавлено {len(new_ads)} объявлений")
+            if response.status_code == 200:
+                print(f"\n🎉 Готово! Добавлено {len(new_ads)} объявлений")
+            else:
+                print(f"❌ Ошибка обновления состояния: {response.status_code}")
         else:
             print("\nℹ️ Новых объявлений нет")
             
@@ -156,4 +187,10 @@ if __name__ == '__main__':
     print("=" * 50)
     print("🚀 Запуск парсера Telegram канала")
     print("=" * 50)
+    
+    # Тестируем подключение
+    if not test_connection():
+        exit(1)
+    
+    # Запускаем парсер
     get_channel_updates()
