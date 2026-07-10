@@ -10,17 +10,14 @@ CHANNEL = '@dnrsabbath'
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
 SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
 
-print(f"🔗 Подключение к Supabase...")
+print(f" Подключение к Supabase...")
 print(f"URL: {SUPABASE_URL}")
 print(f"Key length: {len(SUPABASE_KEY) if SUPABASE_KEY else 0}")
-print(f"Key starts with: {SUPABASE_KEY[:20] if SUPABASE_KEY else 'None'}...")
 
-# Проверяем что ключи есть
 if not SUPABASE_URL or not SUPABASE_KEY:
     print("❌ SUPABASE_URL или SUPABASE_KEY не установлены!")
     exit(1)
 
-# Используем REST API напрямую вместо библиотеки supabase
 HEADERS = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -42,7 +39,7 @@ def test_connection():
             print(f"Response: {response.text}")
             return False
     except Exception as e:
-        print(f"❌ Ошибка: {e}")
+        print(f" Ошибка: {e}")
         return False
 
 def get_channel_updates():
@@ -50,21 +47,18 @@ def get_channel_updates():
     
     print("📥 Получаем последнее состояние парсера...")
     
-    # Получаем последний ID из базы
     url = f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1"
     response = requests.get(url, headers=HEADERS)
     
     if response.status_code != 200:
         print(f"❌ Ошибка чтения parser_state: {response.status_code}")
-        print(f"Response: {response.text}")
         return
     
     data = response.json()
     last_id = data[0]['last_message_id'] if data else 0
     print(f"Последний message_id: {last_id}")
     
-    # Запрашиваем обновления через Bot API
-    print(f"📨 Запрашиваем обновления из канала...")
+    print(f" Запрашиваем обновления из канала...")
     telegram_url = f'https://api.telegram.org/bot{BOT_TOKEN}/getUpdates'
     params = {
         'offset': last_id + 1,
@@ -85,32 +79,55 @@ def get_channel_updates():
         
         new_ads = []
         max_id = last_id
+        skipped_no_text = 0
         
         for update in results:
+            print(f"\n Обрабатываем обновление...")
+            
             if 'channel_post' in update:
                 post = update['channel_post']
                 message_id = post['message_id']
                 
-                if message_id > last_id:
-                    text = post.get('text', '')
+                print(f"  Message ID: {message_id}")
+                
+                # Получаем текст
+                text = post.get('text', '')
+                
+                # Если текста нет, пробуем взять caption к фото/видео
+                if not text:
+                    if 'caption' in post:
+                        text = post['caption']
+                        print(f"  📝 Взято из caption (длина: {len(text)})")
+                    else:
+                        print(f"  ⚠️ Нет текста или caption")
+                        skipped_no_text += 1
+                        if message_id > max_id:
+                            max_id = message_id
+                        continue
+                
+                print(f"  📝 Текст (первые 50 символов): {text[:50]}...")
+                
+                if message_id > last_id and text:
+                    ad = {
+                        'tg_message_id': message_id,
+                        'title': text[:100] if len(text) > 100 else text,
+                        'description': text,
+                        'category': parse_category(text),
+                        'city': parse_city(text),
+                        'phone': extract_phone(text),
+                        'photo_url': None,
+                        'created_at': datetime.now().isoformat()
+                    }
                     
-                    if text:
-                        ad = {
-                            'tg_message_id': message_id,
-                            'title': text[:100] if len(text) > 100 else text,
-                            'description': text,
-                            'category': parse_category(text),
-                            'city': parse_city(text),
-                            'phone': extract_phone(text),
-                            'photo_url': None,
-                            'created_at': datetime.now().isoformat()
-                        }
-                        
-                        new_ads.append(ad)
-                        max_id = message_id
-                        print(f"  ✓ Добавлено объявление #{message_id}")
+                    new_ads.append(ad)
+                    max_id = message_id
+                    print(f"  ✅ Добавлено объявление #{message_id}")
         
-        # Сохраняем в базу
+        print(f"\n📊 Статистика:")
+        print(f"  Всего обновлений: {len(results)}")
+        print(f"  Новых объявлений: {len(new_ads)}")
+        print(f"  Пропущено (нет текста): {skipped_no_text}")
+        
         if new_ads:
             print(f"\n💾 Сохраняем {len(new_ads)} объявлений...")
             url = f"{SUPABASE_URL}/rest/v1/ads"
@@ -122,7 +139,6 @@ def get_channel_updates():
                 print(f"❌ Ошибка сохранения: {response.status_code}")
                 print(f"Response: {response.text}")
             
-            # Обновляем состояние
             print("🔄 Обновляем состояние парсера...")
             url = f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1"
             update_data = {
@@ -144,7 +160,6 @@ def get_channel_updates():
         traceback.print_exc()
 
 def extract_phone(text):
-    """Извлекаем телефон из текста"""
     import re
     phones = re.findall(r'[\+]?[0-9\s\-\(\)]{10,20}', text)
     if phones:
@@ -152,7 +167,6 @@ def extract_phone(text):
     return ''
 
 def parse_category(text):
-    """Определяем категорию по ключевым словам"""
     text_lower = text.lower()
     
     categories = {
@@ -171,7 +185,6 @@ def parse_category(text):
     return 'другое'
 
 def parse_city(text):
-    """Определяем город"""
     text_lower = text.lower()
     
     if 'донецк' in text_lower:
@@ -188,9 +201,7 @@ if __name__ == '__main__':
     print("🚀 Запуск парсера Telegram канала")
     print("=" * 50)
     
-    # Тестируем подключение
     if not test_connection():
         exit(1)
     
-    # Запускаем парсер
     get_channel_updates()
