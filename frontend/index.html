@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Шабашка DNR - Объявления Донецк, Макеевка</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: #f5f5f5;
+        color: #333;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+
+      header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem 1rem;
+        text-align: center;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      .logo {
+        max-width: 200px;
+        height: auto;
+        margin: 0 auto 1rem;
+        display: block;
+        border-radius: 12px;
+      }
+
+      header h1 {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+      }
+
+      header p {
+        opacity: 0.9;
+        font-size: 1.1rem;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+        flex: 1;
+      }
+
+      .filters {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+      }
+
+      .filters select,
+      .filters input {
+        padding: 0.75rem;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 1rem;
+        background: white;
+      }
+
+      .filters input {
+        flex: 1;
+        min-width: 200px;
+      }
+
+      .ads-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+      }
+
+      .ad-card {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+      }
+
+      .ad-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+      }
+
+      .ad-image {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        background: #eee;
+      }
+
+      .ad-content {
+        padding: 1.5rem;
+      }
+
+      .ad-title {
+        font-size: 1.25rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+        color: #333;
+      }
+
+      .ad-description {
+        color: #666;
+        margin-bottom: 1rem;
+        line-height: 1.5;
+        max-height: 100px;
+        overflow: hidden;
+      }
+
+      .ad-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        color: #888;
+      }
+
+      .ad-meta span {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .ad-category {
+        display: inline-block;
+        background: #667eea;
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.85rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .ad-link {
+        display: block;
+        margin-top: 1rem;
+        padding: 0.75rem;
+        background: #667eea;
+        color: white;
+        text-align: center;
+        text-decoration: none;
+        border-radius: 8px;
+        transition: background 0.2s;
+      }
+
+      .ad-link:hover {
+        background: #5568d3;
+      }
+
+      /* Рекламные блоки */
+      .ad-banner {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      .ad-banner h3 {
+        margin-bottom: 1rem;
+        font-size: 1.5rem;
+      }
+
+      .ad-banner a {
+        display: inline-block;
+        margin-top: 1rem;
+        padding: 0.75rem 2rem;
+        background: white;
+        color: #f5576c;
+        text-decoration: none;
+        border-radius: 8px;
+        font-weight: bold;
+        transition: transform 0.2s;
+      }
+
+      .ad-banner a:hover {
+        transform: scale(1.05);
+      }
+
+      /* Футер */
+      footer {
+        background: #2d3748;
+        color: white;
+        padding: 2rem 1rem;
+        margin-top: auto;
+      }
+
+      .footer-content {
+        max-width: 1200px;
+        margin: 0 auto;
+        text-align: center;
+      }
+
+      .social-links {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .social-links a {
+        color: white;
+        font-size: 2rem;
+        transition:
+          transform 0.2s,
+          color 0.2s;
+      }
+
+      .social-links a:hover {
+        transform: translateY(-4px);
+        color: #667eea;
+      }
+
+      .footer-text {
+        opacity: 0.8;
+        font-size: 0.9rem;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 3rem;
+        font-size: 1.2rem;
+        color: #666;
+      }
+
+      .no-results {
+        text-align: center;
+        padding: 3rem;
+        color: #666;
+      }
+
+      @media (max-width: 768px) {
+        header h1 {
+          font-size: 1.5rem;
+        }
+
+        .ads-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .filters {
+          flex-direction: column;
+        }
+
+        .filters input,
+        .filters select {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <!-- Логотип GIF -->
+      <img
+        src="https://krftmuyrshvgbdsstidf.supabase.co/storage/v1/object/public/logos/logo.gif"
+        alt="Шабашка DNR"
+        class="logo"
+        onerror="this.style.display = 'none'"
+      />
+
+      <h1>🔧 Шабашка DNR</h1>
+      <p>Объявления Донецк, Макеевка, Горловка, Мариуполь</p>
+    </header>
+
+    <div class="container">
+      <!-- Рекламный блок -->
+      <div class="ad-banner" id="adBanner" style="display: none">
+        <h3>Разместите свою рекламу здесь!</h3>
+        <p>Ваше объявление увидят тысячи людей</p>
+        <a href="https://t.me/dnrsabbath" target="_blank">Разместить рекламу</a>
+      </div>
+
+      <div class="filters">
+        <select id="categoryFilter" aria-label="Фильтр по категориям">
+          <option value="">Все категории</option>
+          <option value="ремонт">Ремонт</option>
+          <option value="сантехника">Сантехника</option>
+          <option value="электрика">Электрика</option>
+          <option value="строительство">Строительство</option>
+          <option value="грузчики">Грузчики</option>
+          <option value="уборка">Уборка</option>
+          <option value="окна">Окна</option>
+          <option value="другое">Другое</option>
+        </select>
+
+        <select id="cityFilter" aria-label="Фильтр по городу">
+          <option value="">Все города</option>
+          <option value="Донецк">Донецк</option>
+          <option value="Макеевка">Макеевка</option>
+          <option value="Горловка">Горловка</option>
+        </select>
+
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="Поиск по объявлениям..."
+          aria-label="Поиск"
+        />
+      </div>
+
+      <div id="adsContainer" class="ads-grid">
+        <div class="loading">Загрузка объявлений...</div>
+      </div>
+    </div>
+
+    <footer>
+      <div class="footer-content">
+        <div class="social-links">
+          <a
+            href="https://vk.com/shabashka_dnr"
+            target="_blank"
+            title="ВКонтакте"
+          >
+            <i class="fab fa-vk"></i>
+          </a>
+          <a href="https://t.me/dnrsabbath" target="_blank" title="Telegram">
+            <i class="fab fa-telegram-plane"></i>
+          </a>
+          <a href="https://max.ru" target="_blank" title="MAX">
+            <i class="fas fa-briefcase"></i>
+          </a>
+        </div>
+        <p class="footer-text">
+          © 2026 Шабашка DNR - Услуги и объявления<br />
+          Донецк, Макеевка, Горловка
+        </p>
+      </div>
+    </footer>
+
+    <script>
+      // Supabase конфигурация
+      const SUPABASE_URL = "https://krftmuyrshvgbdsstidf.supabase.co";
+      const SUPABASE_ANON_KEY =
+        "sb_publishable_tDL_3P4gQohwHCkbRMPHYg_4kcJCFap"; // ЗАМЕНИТЕ!
+
+      const supabase = window.supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY,
+      );
+
+      let allAds = [];
+
+      // Загрузка объявлений
+      async function loadAds() {
+        try {
+          const { data, error } = await supabase
+            .from("ads")
+            .select("*")
+            .order("created_at", { ascending: false });
+
+          if (error) throw error;
+
+          allAds = data || [];
+          renderAds(allAds);
+
+          // Показываем рекламный блок если есть реклама
+          checkPaidAds();
+        } catch (error) {
+          console.error("Ошибка загрузки:", error);
+          document.getElementById("adsContainer").innerHTML =
+            '<div class="no-results">Ошибка загрузки объявлений</div>';
+        }
+      }
+
+      // Проверка платной рекламы
+      async function checkPaidAds() {
+        try {
+          const { data } = await supabase
+            .from("paid_ads")
+            .select("*")
+            .eq("active", true)
+            .order("priority", { ascending: false })
+            .limit(1)
+            .single();
+
+          if (data) {
+            const banner = document.getElementById("adBanner");
+            banner.innerHTML = `
+                        <h3>${data.title}</h3>
+                        <p>${data.description}</p>
+                        <a href="${data.link}" target="_blank">${data.button_text || "Подробнее"}</a>
+                    `;
+            banner.style.display = "block";
+          }
+        } catch (error) {
+          // Нет таблицы paid_ads или рекламы
+        }
+      }
+
+      // Отображение объявлений
+      function renderAds(ads) {
+        const container = document.getElementById("adsContainer");
+
+        if (ads.length === 0) {
+          container.innerHTML =
+            '<div class="no-results">Объявления не найдены</div>';
+          return;
+        }
+
+        container.innerHTML = ads
+          .map(
+            (ad) => `
+                <div class="ad-card">
+                    ${ad.photo_url ? `<img src="${ad.photo_url}" class="ad-image" alt="${ad.title}">` : ""}
+                    <div class="ad-content">
+                        <span class="ad-category">${ad.category || "другое"}</span>
+                        <h3 class="ad-title">${ad.title || "Без названия"}</h3>
+                        <p class="ad-description">${ad.description || "Нет описания"}</p>
+                        <div class="ad-meta">
+                            <span>📍 ${ad.city || "Донецк"}</span>
+                            ${ad.phone ? `<span> ${ad.phone}</span>` : ""}
+                            ${ad.forwarded_from ? `<span>️ ${ad.forwarded_from}</span>` : ""}
+                            <span>🕐 ${new Date(ad.created_at).toLocaleString("ru-RU")}</span>
+                        </div>
+                        ${ad.post_link ? `<a href="${ad.post_link}" target="_blank" class="ad-link">Открыть в Telegram</a>` : ""}
+                    </div>
+                </div>
+            `,
+          )
+          .join("");
+      }
+
+      // Фильтрация
+      function filterAds() {
+        const category = document.getElementById("categoryFilter").value;
+        const city = document.getElementById("cityFilter").value;
+        const search = document
+          .getElementById("searchInput")
+          .value.toLowerCase();
+
+        let filtered = allAds;
+
+        if (category) {
+          filtered = filtered.filter((ad) => ad.category === category);
+        }
+
+        if (city) {
+          filtered = filtered.filter((ad) => ad.city === city);
+        }
+
+        if (search) {
+          filtered = filtered.filter(
+            (ad) =>
+              (ad.title && ad.title.toLowerCase().includes(search)) ||
+              (ad.description && ad.description.toLowerCase().includes(search)),
+          );
+        }
+
+        renderAds(filtered);
+      }
+
+      // Обработчики событий
+      document
+        .getElementById("categoryFilter")
+        .addEventListener("change", filterAds);
+      document
+        .getElementById("cityFilter")
+        .addEventListener("change", filterAds);
+      document
+        .getElementById("searchInput")
+        .addEventListener("input", filterAds);
+
+      // Загрузка при старте
+      loadAds();
+    </script>
+  </body>
+</html>
