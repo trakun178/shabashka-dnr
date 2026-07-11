@@ -4,6 +4,51 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Шабашка DNR - Объявления Донецк, Макеевка</title>
+    <!-- Фавикон -->
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="images/favicon-32x32.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="images/favicon-16x16.png"
+    />
+
+    <!-- Apple (iPhone/iPad) -->
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="images/apple-touch-icon.png"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="Шабашка DNR" />
+
+    <!-- Android / PWA -->
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#667eea" />
+
+    <!-- Описание для поисковиков -->
+    <meta
+      name="description"
+      content="Объявления и услуги Донецк, Макеевка, Горловка, Мариуполь. Ремонт, сантехника, электрика, строительство."
+    />
+
+    <!-- Open Graph (для соцсетей) -->
+    <meta property="og:title" content="Шабашка DNR - Объявления" />
+    <meta
+      property="og:description"
+      content="Объявления и услуги Донецк, Макеевка, Горловка, Мариуполь"
+    />
+    <meta property="og:image" content="images/icon-512x512.png" />
+    <meta property="og:url" content="https://shabashka-dnr.pages.dev" />
 
     <!-- Supabase библиотека -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -282,7 +327,18 @@
   </head>
   <body>
     <header>
-      <h1>🔧 Шабашка DNR</h1>
+      <img
+        src="images/logo.png"
+        alt="Шабашка DNR"
+        style="
+          max-width: 250px;
+          height: auto;
+          margin: 0 auto 1rem;
+          display: block;
+          border-radius: 12px;
+        "
+      />
+      <h1>Шабашка DNR</h1>
       <p>Объявления Донецк, Макеевка, Горловка, Мариуполь</p>
     </header>
 
