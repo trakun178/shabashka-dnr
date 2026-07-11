@@ -30,7 +30,7 @@ def get_file_url(file_id):
             file_path = file_data['result']['file_path']
             return f'https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}'
     except Exception as e:
-        print(f"  ️ Ошибка получения файла: {e}")
+        print(f"  ⚠️ Ошибка получения файла: {e}")
     return None
 
 def extract_phone(text):
@@ -115,14 +115,14 @@ def get_channel_updates():
     response = requests.get(url, headers=HEADERS)
     
     if response.status_code != 200:
-        print(f"❌ Ошибка чтения parser_state: {response.status_code}")
+        print(f" Ошибка чтения parser_state: {response.status_code}")
         return
     
     data = response.json()
     last_id = data[0]['last_message_id'] if data else 0
     
     # 2. Проверяем реальное последнее сообщение в базе ads
-    print(" Проверяем последние сообщения в базе ads...")
+    print("🔍 Проверяем последние сообщения в базе ads...")
     ads_url = f"{SUPABASE_URL}/rest/v1/ads?order=tg_message_id.desc&limit=1"
     ads_response = requests.get(ads_url, headers=HEADERS)
     
@@ -140,39 +140,41 @@ def get_channel_updates():
     
     print(f"✅ Будем искать сообщения > {last_id}")
     
-    # 4. Проверяем есть ли новые сообщения в Telegram
-    print(f"📡 Проверяем обновления в Telegram...")
+    # 4. Получаем ВСЕ доступные обновления из Telegram
+    print(f"📡 Получаем обновления из Telegram...")
     telegram_url = f'https://api.telegram.org/bot{BOT_TOKEN}/getUpdates'
     params = {
-        'offset': last_id + 1,
-        'limit': 1,  # Проверяем только наличие новых
-        'timeout': 10
+        'limit': 100,
+        'timeout': 30
     }
     
     try:
-        response = requests.get(telegram_url, params=params, timeout=30)
+        response = requests.get(telegram_url, params=params, timeout=60)
         data = response.json()
         
         if not data.get('ok'):
             print(f"❌ Telegram API error: {data}")
             return
         
-        results = data.get('result', [])
+        all_updates = data.get('result', [])
+        print(f"📬 Получено {len(all_updates)} обновлений из Telegram")
+        
+        # 5. Фильтруем ТОЛЬКО channel_post с message_id > last_id
+        results = []
+        for update in all_updates:
+            if 'channel_post' in update:
+                message_id = update['channel_post']['message_id']
+                if message_id > last_id:
+                    results.append(update)
+                    print(f"  ✅ Новое сообщение: {message_id}")
+                else:
+                    print(f"  ⏭️ Пропущено (старое): {message_id}")
         
         if not results:
             print("ℹ️ Новых сообщений нет. Парсер завершает работу.")
             return
         
-        print(f"✅ Найдены новые сообщения! Загружаем...")
-        
-        # 5. Загружаем все новые сообщения (до 100)
-        params['limit'] = 100
-        params['offset'] = last_id + 1
-        response = requests.get(telegram_url, params=params, timeout=60)
-        data = response.json()
-        results = data.get('result', [])
-        
-        print(f"📬 Получено {len(results)} обновлений")
+        print(f"✅ Найдено {len(results)} новых сообщений для обработки")
         
         new_ads = []
         max_id = last_id
@@ -184,11 +186,6 @@ def get_channel_updates():
             if 'channel_post' in update:
                 post = update['channel_post']
                 message_id = post['message_id']
-                
-                # Пропускаем если уже сохранено
-                if message_id <= last_id:
-                    print(f"  ⏭️ Уже сохранен (ID: {message_id})")
-                    continue
                 
                 print(f"  📨 Message ID: {message_id}")
                 
@@ -293,10 +290,10 @@ def get_channel_updates():
             else:
                 print(f"⚠️ Ошибка обновления состояния: {response.status_code}")
         else:
-            print("\n️ Новых объявлений для сохранения нет")
+            print("\nℹ️ Новых объявлений для сохранения нет")
             
     except Exception as e:
-        print(f" Ошибка: {e}")
+        print(f"❌ Ошибка: {e}")
         import traceback
         traceback.print_exc()
 
