@@ -121,12 +121,10 @@
         color: #333;
       }
 
-      .ad-description {
-        color: #666;
-        margin-bottom: 1rem;
-        line-height: 1.5;
-        max-height: 100px;
-        overflow: hidden;
+      @media (max-width: 768px) {
+        .ad-description {
+          font-size: 0.95rem;
+        }
       }
 
       .ad-meta {
@@ -447,10 +445,7 @@
             }
 
             // Описание - полный текст
-            let description = ad.description || "";
-            if (description.length > 500) {
-              description = description.substring(0, 500) + "...";
-            }
+            let description = ad.description || "Нет описания";
 
             return `
             <div class="ad-card">
