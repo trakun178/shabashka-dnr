@@ -1,0 +1,5 @@
+parser/
+.github/
+.env.local
+wrangler.toml
+README.md
