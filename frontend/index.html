@@ -223,14 +223,14 @@
         margin-top: 1rem;
         padding-top: 1rem;
         border-top: 2px solid #ffb800;
-        font-weight: 700;
+        font-weight: 700; /* ЖИРНЫЙ ТЕКСТ */
       }
 
       .ad-meta span {
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        font-weight: 700;
+        font-weight: 700; /* ЖИРНЫЙ ТЕКСТ */
       }
 
       .ad-category {
@@ -380,7 +380,7 @@
   <body>
     <header>
       <img src="images/logo.png" alt="Шабашка DNR" />
-      <h1>Шабашка DNR</h1>
+      <h1>🔧 Шабашка DNR</h1>
       <p>Объявления Донецк, Макеевка, Горловка, Мариуполь</p>
     </header>
 
@@ -590,7 +590,7 @@
                             <h3 class="ad-title">${title}</h3>
                             <p class="ad-description">${description}</p>
                             <div class="ad-meta">
-                                <span> ${ad.city || "Донецк"}</span>
+                                <span>📍 ${ad.city || "Донецк"}</span>
                                 ${ad.phone ? `<span>📞 ${ad.phone}</span>` : ""}
                                 ${ad.forwarded_from ? `<span>↪️ ${ad.forwarded_from}</span>` : ""}
                                 <span>🕐 ${new Date(ad.created_at).toLocaleString("ru-RU")}</span>
