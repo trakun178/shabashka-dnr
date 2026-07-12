@@ -4,7 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Шабашка DNR - Объявления Донецк, Макеевка</title>
-    <!-- Фавикон -->
+
+    <!-- Supabase библиотека -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Иконки Font Awesome -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+
+    <!-- Фавиконы -->
     <link
       rel="icon"
       type="image/png"
@@ -17,23 +27,14 @@
       sizes="16x16"
       href="images/favicon-16x16.png"
     />
-
-    <!-- Apple (iPhone/iPad) -->
     <link
       rel="apple-touch-icon"
       sizes="180x180"
       href="images/apple-touch-icon.png"
     />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta
-      name="apple-mobile-web-app-status-bar-style"
-      content="black-translucent"
-    />
-    <meta name="apple-mobile-web-app-title" content="Шабашка DNR" />
-
-    <!-- Android / PWA -->
     <link rel="manifest" href="manifest.json" />
-    <meta name="theme-color" content="#667eea" />
+    <link rel="shortcut icon" href="images/favicon.ico" />
+    <meta name="theme-color" content="#FFB800" />
 
     <!-- Описание для поисковиков -->
     <meta
@@ -48,16 +49,7 @@
       content="Объявления и услуги Донецк, Макеевка, Горловка, Мариуполь"
     />
     <meta property="og:image" content="images/icon-512x512.png" />
-    <meta property="og:url" content="https://shabashka-dnr.pages.dev" />
-
-    <!-- Supabase библиотека -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-    <!-- Иконки Font Awesome -->
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-    />
+    <meta property="og:url" content="https://shabashka.sofoniya.ru" />
 
     <style>
       * {
@@ -69,7 +61,20 @@
       body {
         font-family:
           -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        background: #f5f5f5;
+        background:
+          linear-gradient(
+            135deg,
+            rgba(255, 184, 0, 0.05) 0%,
+            rgba(10, 10, 10, 0.95) 100%
+          ),
+          repeating-linear-gradient(
+            45deg,
+            transparent,
+            transparent 10px,
+            rgba(255, 184, 0, 0.03) 10px,
+            rgba(255, 184, 0, 0.03) 20px
+          );
+        background-color: #0a0a0a;
         color: #333;
         display: flex;
         flex-direction: column;
@@ -77,21 +82,55 @@
       }
 
       header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
+        background: linear-gradient(135deg, #ffb800 0%, #ff8c00 100%);
+        color: #000;
         padding: 2rem 1rem;
         text-align: center;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 15px rgba(255, 184, 0, 0.4);
+        position: relative;
+        overflow: hidden;
+      }
+
+      header::before {
+        content: "";
+        position: absolute;
+        top: -50%;
+        right: -10%;
+        width: 200%;
+        height: 200%;
+        background: linear-gradient(
+          45deg,
+          transparent 30%,
+          rgba(255, 255, 255, 0.1) 50%,
+          transparent 70%
+        );
+        transform: rotate(45deg);
+      }
+
+      header img {
+        max-width: 250px;
+        height: auto;
+        margin: 0 auto 1rem;
+        display: block;
+        border-radius: 12px;
+        position: relative;
+        z-index: 1;
       }
 
       header h1 {
         font-size: 2rem;
         margin-bottom: 0.5rem;
+        font-weight: 800;
+        position: relative;
+        z-index: 1;
       }
 
       header p {
         opacity: 0.9;
         font-size: 1.1rem;
+        font-weight: 600;
+        position: relative;
+        z-index: 1;
       }
 
       .container {
@@ -111,10 +150,11 @@
       .filters select,
       .filters input {
         padding: 0.75rem;
-        border: 1px solid #ddd;
+        border: 2px solid #ffb800;
         border-radius: 8px;
         font-size: 1rem;
         background: white;
+        font-weight: 600;
       }
 
       .filters input {
@@ -122,7 +162,6 @@
         min-width: 200px;
       }
 
-      /* Вертикальный список как в Telegram */
       .ads-list {
         display: flex;
         flex-direction: column;
@@ -133,16 +172,17 @@
         background: white;
         border-radius: 12px;
         overflow: hidden;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 12px rgba(255, 184, 0, 0.15);
         transition:
           transform 0.2s,
           box-shadow 0.2s;
         width: 100%;
+        border-left: 4px solid #ffb800;
       }
 
       .ad-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 6px 20px rgba(255, 184, 0, 0.25);
       }
 
       .ad-image {
@@ -161,15 +201,15 @@
         font-size: 1.25rem;
         font-weight: bold;
         margin-bottom: 0.75rem;
-        color: #333;
+        color: #000;
         line-height: 1.4;
       }
 
       .ad-description {
-        color: #555;
+        color: #333;
         margin-bottom: 1rem;
         line-height: 1.6;
-        white-space: pre-wrap; /* Сохраняем переносы строк! */
+        white-space: pre-wrap;
         word-wrap: break-word;
         font-size: 1rem;
       }
@@ -179,67 +219,75 @@
         flex-direction: column;
         gap: 0.5rem;
         font-size: 0.9rem;
-        color: #888;
+        color: #333;
         margin-top: 1rem;
         padding-top: 1rem;
-        border-top: 1px solid #eee;
+        border-top: 2px solid #ffb800;
+        font-weight: 700;
       }
 
       .ad-meta span {
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        font-weight: 700;
       }
 
       .ad-category {
         display: inline-block;
-        background: #667eea;
-        color: white;
+        background: linear-gradient(135deg, #ffb800 0%, #ff8c00 100%);
+        color: #000;
         padding: 0.35rem 0.85rem;
         border-radius: 12px;
         font-size: 0.85rem;
         margin-bottom: 0.75rem;
-        font-weight: 500;
+        font-weight: 700;
       }
 
       .ad-link {
         display: block;
         margin-top: 1rem;
         padding: 0.85rem;
-        background: #667eea;
-        color: white;
+        background: linear-gradient(135deg, #ffb800 0%, #ff8c00 100%);
+        color: #000;
         text-align: center;
         text-decoration: none;
         border-radius: 8px;
-        transition: background 0.2s;
-        font-weight: 500;
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+        font-weight: 700;
+        box-shadow: 0 2px 8px rgba(255, 184, 0, 0.3);
       }
 
       .ad-link:hover {
-        background: #5568d3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(255, 184, 0, 0.4);
       }
 
       .ad-banner {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        color: white;
+        background: linear-gradient(135deg, #ffb800 0%, #ff8c00 100%);
+        color: #000;
         padding: 2rem;
         border-radius: 12px;
         margin-bottom: 2rem;
         text-align: center;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 4px 12px rgba(255, 184, 0, 0.3);
+        font-weight: 600;
       }
 
       .ad-banner h3 {
         margin-bottom: 1rem;
         font-size: 1.5rem;
+        font-weight: 800;
       }
 
       .ad-banner a {
         display: inline-block;
         margin-top: 1rem;
         padding: 0.75rem 2rem;
-        background: white;
-        color: #f5576c;
+        background: #000;
+        color: #ffb800;
         text-decoration: none;
         border-radius: 8px;
         font-weight: bold;
@@ -251,10 +299,11 @@
       }
 
       footer {
-        background: #2d3748;
-        color: white;
+        background: #000;
+        color: #ffb800;
         padding: 2rem 1rem;
         margin-top: auto;
+        border-top: 3px solid #ffb800;
       }
 
       .footer-content {
@@ -271,7 +320,7 @@
       }
 
       .social-links a {
-        color: white;
+        color: #ffb800;
         font-size: 2rem;
         transition:
           transform 0.2s,
@@ -280,25 +329,28 @@
 
       .social-links a:hover {
         transform: translateY(-4px);
-        color: #667eea;
+        color: #ffd700;
       }
 
       .footer-text {
-        opacity: 0.8;
+        opacity: 0.9;
         font-size: 0.9rem;
+        font-weight: 600;
       }
 
       .loading {
         text-align: center;
         padding: 3rem;
         font-size: 1.2rem;
-        color: #666;
+        color: #ffb800;
+        font-weight: 600;
       }
 
       .no-results {
         text-align: center;
         padding: 3rem;
-        color: #666;
+        color: #ffb800;
+        font-weight: 600;
       }
 
       @media (max-width: 768px) {
@@ -327,17 +379,7 @@
   </head>
   <body>
     <header>
-      <img
-        src="images/logo.png"
-        alt="Шабашка DNR"
-        style="
-          max-width: 250px;
-          height: auto;
-          margin: 0 auto 1rem;
-          display: block;
-          border-radius: 12px;
-        "
-      />
+      <img src="images/logo.png" alt="Шабашка DNR" />
       <h1>Шабашка DNR</h1>
       <p>Объявления Донецк, Макеевка, Горловка, Мариуполь</p>
     </header>
@@ -549,8 +591,8 @@
                             <p class="ad-description">${description}</p>
                             <div class="ad-meta">
                                 <span> ${ad.city || "Донецк"}</span>
-                                ${ad.phone ? `<span> ${ad.phone}</span>` : ""}
-                                ${ad.forwarded_from ? `<span>️ ${ad.forwarded_from}</span>` : ""}
+                                ${ad.phone ? `<span>📞 ${ad.phone}</span>` : ""}
+                                ${ad.forwarded_from ? `<span>↪️ ${ad.forwarded_from}</span>` : ""}
                                 <span>🕐 ${new Date(ad.created_at).toLocaleString("ru-RU")}</span>
                             </div>
                             ${ad.post_link ? `<a href="${ad.post_link}" target="_blank" rel="noopener noreferrer" class="ad-link">Открыть в Telegram</a>` : ""}
