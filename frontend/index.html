@@ -36,13 +36,11 @@
     <link rel="shortcut icon" href="images/favicon.ico" />
     <meta name="theme-color" content="#FFB800" />
 
-    <!-- Описание для поисковиков -->
+    <!-- Описание -->
     <meta
       name="description"
-      content="Объявления и услуги Донецк, Макеевка, Горловка, Мариуполь. Ремонт, сантехника, электрика, строительство."
+      content="Объявления и услуги Донецк, Макеевка, Горловка, Мариуполь"
     />
-
-    <!-- Open Graph (для соцсетей) -->
     <meta property="og:title" content="Шабашка DNR - Объявления" />
     <meta
       property="og:description"
@@ -193,6 +191,26 @@
         display: block;
       }
 
+      .ad-photos {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 0.5rem;
+        padding: 0.5rem;
+      }
+
+      .ad-photo {
+        width: 100%;
+        max-height: 400px;
+        object-fit: cover;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: transform 0.2s;
+      }
+
+      .ad-photo:hover {
+        transform: scale(1.02);
+      }
+
       .ad-content {
         padding: 1.5rem;
       }
@@ -223,14 +241,14 @@
         margin-top: 1rem;
         padding-top: 1rem;
         border-top: 2px solid #ffb800;
-        font-weight: 700; /* ЖИРНЫЙ ТЕКСТ */
+        font-weight: 700;
       }
 
       .ad-meta span {
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        font-weight: 700; /* ЖИРНЫЙ ТЕКСТ */
+        font-weight: 700;
       }
 
       .ad-category {
@@ -497,7 +515,6 @@
     </footer>
 
     <script>
-      // Supabase конфигурация
       const SUPABASE_URL = "https://krftmuyrshvgbdsstidf.supabase.co";
       const SUPABASE_ANON_KEY =
         "sb_publishable_l6VMNPTJmOS3o8G2g99SRQ_cwMHGzFr";
@@ -509,7 +526,6 @@
 
       let allAds = [];
 
-      // Загрузка объявлений
       async function loadAds() {
         try {
           const { data, error } = await supabaseClient
@@ -529,7 +545,6 @@
         }
       }
 
-      // Проверка платной рекламы
       async function checkPaidAds() {
         try {
           const { data } = await supabaseClient
@@ -550,11 +565,10 @@
             banner.style.display = "block";
           }
         } catch (error) {
-          // Нет таблицы paid_ads или рекламы
+          // Нет рекламы
         }
       }
 
-      // Отображение объявлений
       function renderAds(ads) {
         const container = document.getElementById("adsContainer");
 
@@ -566,7 +580,6 @@
 
         container.innerHTML = ads
           .map((ad) => {
-            // Умный заголовок
             let title = ad.title;
             if (
               !title ||
@@ -579,20 +592,41 @@
                   : ad.description || "Без описания";
             }
 
-            // Полный текст с сохранением переносов строк
             let description = ad.description || "Нет описания";
+
+            // Получаем все фото
+            let photo_urls = [];
+            try {
+              photo_urls = ad.photo_urls ? JSON.parse(ad.photo_urls) : [];
+            } catch (e) {
+              photo_urls = ad.photo_url ? [ad.photo_url] : [];
+            }
+
+            // HTML для фото
+            let photos_html = "";
+            if (photo_urls.length > 0) {
+              if (photo_urls.length === 1) {
+                photos_html = `<img src="${photo_urls[0]}" class="ad-image" alt="${title}">`;
+              } else {
+                photos_html = '<div class="ad-photos">';
+                photo_urls.forEach((url, idx) => {
+                  photos_html += `<img src="${url}" class="ad-photo" alt="${title} ${idx + 1}" onclick="window.open('${url}', '_blank')">`;
+                });
+                photos_html += "</div>";
+              }
+            }
 
             return `
                     <div class="ad-card">
-                        ${ad.photo_url ? `<img src="${ad.photo_url}" class="ad-image" alt="${title}">` : ""}
+                        ${photos_html}
                         <div class="ad-content">
                             <span class="ad-category">${ad.category || "другое"}</span>
                             <h3 class="ad-title">${title}</h3>
                             <p class="ad-description">${description}</p>
                             <div class="ad-meta">
-                                <span>📍 ${ad.city || "Донецк"}</span>
-                                ${ad.phone ? `<span>📞 ${ad.phone}</span>` : ""}
-                                ${ad.forwarded_from ? `<span>↪️ ${ad.forwarded_from}</span>` : ""}
+                                <span> ${ad.city || "Донецк"}</span>
+                                ${ad.phone ? `<span> ${ad.phone}</span>` : ""}
+                                ${ad.forwarded_from ? `<span>️ ${ad.forwarded_from}</span>` : ""}
                                 <span>🕐 ${new Date(ad.created_at).toLocaleString("ru-RU")}</span>
                             </div>
                             ${ad.post_link ? `<a href="${ad.post_link}" target="_blank" rel="noopener noreferrer" class="ad-link">Открыть в Telegram</a>` : ""}
@@ -603,7 +637,6 @@
           .join("");
       }
 
-      // Фильтрация
       function filterAds() {
         const category = document.getElementById("categoryFilter").value;
         const city = document.getElementById("cityFilter").value;
@@ -632,7 +665,6 @@
         renderAds(filtered);
       }
 
-      // Обработчики событий
       document
         .getElementById("categoryFilter")
         .addEventListener("change", filterAds);
@@ -643,7 +675,6 @@
         .getElementById("searchInput")
         .addEventListener("input", filterAds);
 
-      // Загрузка при старте
       loadAds();
     </script>
   </body>
