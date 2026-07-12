@@ -1,6 +1,7 @@
 import os
 import requests
 from datetime import datetime
+import json
 
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
@@ -81,20 +82,16 @@ def parse_city(text):
     return 'Донецк'
 
 def smart_title(text, max_length=70):
-    """Умная обрезка заголовка до max_length символов без разрыва слов"""
+    """Умная обрезка заголовка"""
     if not text or len(text) <= max_length:
         return text
     
-    # Обрезаем до max_length
     truncated = text[:max_length]
-    
-    # Ищем последний пробел
     last_space = truncated.rfind(' ')
     
     if last_space > 0:
         truncated = truncated[:last_space]
     
-    # Удаляем предлоги и союзы в конце
     stop_words = ['а', 'и', 'в', 'на', 'не', 'при', 'но', 'или', 'если', 'бы', 'ли', 'же', 'то', 'как', 'так', 'для', 'без', 'под', 'над', 'из', 'с', 'к', 'по', 'до', 'от', 'за', 'о', 'об']
     
     words = truncated.split()
@@ -110,12 +107,12 @@ def get_channel_updates():
     print("=" * 50)
     
     # 1. Получаем last_message_id из Supabase
-    print("📥 Получаем последнее состояние парсера...")
+    print(" Получаем последнее состояние парсера...")
     url = f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1"
     response = requests.get(url, headers=HEADERS)
     
     if response.status_code != 200:
-        print(f" Ошибка чтения parser_state: {response.status_code}")
+        print(f"❌ Ошибка чтения parser_state: {response.status_code}")
         return
     
     data = response.json()
@@ -157,7 +154,7 @@ def get_channel_updates():
             return
         
         all_updates = data.get('result', [])
-        print(f"📬 Получено {len(all_updates)} обновлений из Telegram")
+        print(f" Получено {len(all_updates)} обновлений из Telegram")
         
         # 5. Фильтруем ТОЛЬКО channel_post с message_id > last_id
         results = []
@@ -176,92 +173,186 @@ def get_channel_updates():
         
         print(f"✅ Найдено {len(results)} новых сообщений для обработки")
         
+        # 6. ГРУППИРУЕМ сообщения по media_group_id
+        print("\n🔗 Группируем сообщения по альбомам...")
+        groups = {}  # media_group_id -> список сообщений
+        single_messages = []  # сообщения без media_group_id
+        
+        for update in results:
+            post = update['channel_post']
+            media_group_id = post.get('media_group_id')
+            
+            if media_group_id:
+                if media_group_id not in groups:
+                    groups[media_group_id] = []
+                groups[media_group_id].append(post)
+                print(f"  📸 Сообщение {post['message_id']} в альбоме {media_group_id}")
+            else:
+                single_messages.append(post)
+                print(f"   Одиночное сообщение {post['message_id']}")
+        
+        print(f"\n📊 Статистика группировки:")
+        print(f"  Альбомов: {len(groups)}")
+        print(f"  Одиночных сообщений: {len(single_messages)}")
+        
+        # 7. Обрабатываем альбомы (группы фото)
         new_ads = []
         max_id = last_id
         saved_count = 0
         
-        for update in results:
-            print(f"\n🔍 Обрабатываем обновление...")
+        for media_group_id, posts in groups.items():
+            print(f"\n️ Обрабатываем альбом {media_group_id} ({len(posts)} фото)...")
             
-            if 'channel_post' in update:
-                post = update['channel_post']
-                message_id = post['message_id']
-                
-                print(f"  📨 Message ID: {message_id}")
-                
-                # Получаем текст
+            # Берём первое сообщение как основное
+            main_post = posts[0]
+            message_id = main_post['message_id']
+            
+            # Собираем текст из всех сообщений группы
+            combined_text = ''
+            for post in posts:
                 text = post.get('text', '')
                 if not text and 'caption' in post:
                     text = post['caption']
-                
-                # Ссылка на пост
-                channel_username = post.get('chat', {}).get('username', 'dnrsabbath')
-                post_link = f"https://t.me/{channel_username}/{message_id}"
-                
-                # Переслано от
-                forwarded_from = None
-                if 'forward_from' in post:
-                    sender = post['forward_from']
-                    forwarded_from = sender.get('first_name', '') + ' ' + sender.get('last_name', '')
-                    if sender.get('username'):
-                        forwarded_from += f" (@{sender['username']})"
-                elif 'forward_from_chat' in post:
-                    chat = post['forward_from_chat']
-                    forwarded_from = chat.get('title', 'Unknown')
-                    if chat.get('username'):
-                        forwarded_from += f" (@{chat['username']})"
-                elif 'forward_sender_name' in post:
-                    forwarded_from = post['forward_sender_name']
-                    if not forwarded_from or not any(c.isalpha() for c in forwarded_from):
-                        forwarded_from = "Скрытый профиль"
-                
-                # Медиа
-                photo_url = None
-                has_media = False
-                
+                if text:
+                    combined_text += text + '\n'
+            
+            combined_text = combined_text.strip()
+            
+            # Собираем ВСЕ фото из альбома
+            photo_urls = []
+            for post in posts:
                 if 'photo' in post:
-                    has_media = True
                     photos = post['photo']
                     if photos:
                         largest_photo = photos[-1]
                         photo_url = get_file_url(largest_photo['file_id'])
-                
-                if 'video' in post:
-                    has_media = True
+                        if photo_url:
+                            photo_urls.append(photo_url)
+                elif 'video' in post:
                     photo_url = get_file_url(post['video']['file_id'])
-                
-                if 'document' in post:
-                    has_media = True
+                    if photo_url:
+                        photo_urls.append(photo_url)
+                elif 'document' in post:
                     photo_url = get_file_url(post['document']['file_id'])
+                    if photo_url:
+                        photo_urls.append(photo_url)
+            
+            print(f"  📸 Найдено фото: {len(photo_urls)}")
+            
+            # Создаём объявление
+            if combined_text or photo_urls:
+                title = smart_title(combined_text if combined_text else f"Объявление #{message_id}")
+                description = combined_text if combined_text else "Объявление с медиа файлом"
                 
-                # Создаем объявление
-                if text or has_media:
-                    title = smart_title(text if text else f"Объявление #{message_id}")
-                    description = text if text else "Объявление с медиа файлом"
-                    
-                    ad = {
-                        'tg_message_id': message_id,
-                        'title': title,
-                        'description': description,
-                        'category': parse_category(text) if text else 'другое',
-                        'city': parse_city(text) if text else 'Донецк',
-                        'phone': extract_phone(text) if text else '',
-                        'photo_url': photo_url,
-                        'post_link': post_link,
-                        'forwarded_from': forwarded_from,
-                        'created_at': datetime.now().isoformat()
-                    }
-                    
-                    new_ads.append(ad)
-                    max_id = message_id
-                    saved_count += 1
-                    print(f"  ✅ Добавлено (ID: {message_id})")
+                ad = {
+                    'tg_message_id': message_id,
+                    'title': title,
+                    'description': description,
+                    'category': parse_category(combined_text) if combined_text else 'другое',
+                    'city': parse_city(combined_text) if combined_text else 'Донецк',
+                    'phone': extract_phone(combined_text) if combined_text else '',
+                    'photo_url': photo_urls[0] if photo_urls else None,  # Первое фото
+                    'photo_urls': json.dumps(photo_urls),  # Все фото
+                    'post_link': f"https://t.me/{main_post.get('chat', {}).get('username', 'dnrsabbath')}/{message_id}",
+                    'forwarded_from': main_post.get('forward_sender_name') or 
+                                     (main_post.get('forward_from_chat', {}).get('title') if 'forward_from_chat' in main_post else None),
+                    'created_at': datetime.now().isoformat()
+                }
+                
+                new_ads.append(ad)
+                max_id = max(max_id, message_id)
+                saved_count += 1
+                print(f"  ✅ Альбом добавлен (ID: {message_id}, фото: {len(photo_urls)})")
         
-        print(f"\n📊 Статистика:")
+        # 8. Обрабатываем одиночные сообщения
+        for post in single_messages:
+            print(f"\n🔍 Обрабатываем одиночное сообщение...")
+            
+            message_id = post['message_id']
+            
+            # Получаем текст
+            text = post.get('text', '')
+            if not text and 'caption' in post:
+                text = post['caption']
+            
+            # Ссылка на пост
+            channel_username = post.get('chat', {}).get('username', 'dnrsabbath')
+            post_link = f"https://t.me/{channel_username}/{message_id}"
+            
+            # Переслано от
+            forwarded_from = None
+            if 'forward_from' in post:
+                sender = post['forward_from']
+                forwarded_from = sender.get('first_name', '') + ' ' + sender.get('last_name', '')
+                if sender.get('username'):
+                    forwarded_from += f" (@{sender['username']})"
+            elif 'forward_from_chat' in post:
+                chat = post['forward_from_chat']
+                forwarded_from = chat.get('title', 'Unknown')
+                if chat.get('username'):
+                    forwarded_from += f" (@{chat['username']})"
+            elif 'forward_sender_name' in post:
+                forwarded_from = post['forward_sender_name']
+                if not forwarded_from or not any(c.isalpha() for c in forwarded_from):
+                    forwarded_from = "Скрытый профиль"
+            
+            # Медиа
+            photo_url = None
+            photo_urls = []
+            has_media = False
+            
+            if 'photo' in post:
+                has_media = True
+                photos = post['photo']
+                if photos:
+                    largest_photo = photos[-1]
+                    photo_url = get_file_url(largest_photo['file_id'])
+                    if photo_url:
+                        photo_urls.append(photo_url)
+            
+            if 'video' in post:
+                has_media = True
+                photo_url = get_file_url(post['video']['file_id'])
+                if photo_url:
+                    photo_urls.append(photo_url)
+            
+            if 'document' in post:
+                has_media = True
+                photo_url = get_file_url(post['document']['file_id'])
+                if photo_url:
+                    photo_urls.append(photo_url)
+            
+            # Создаем объявление
+            if text or has_media:
+                title = smart_title(text if text else f"Объявление #{message_id}")
+                description = text if text else "Объявление с медиа файлом"
+                
+                ad = {
+                    'tg_message_id': message_id,
+                    'title': title,
+                    'description': description,
+                    'category': parse_category(text) if text else 'другое',
+                    'city': parse_city(text) if text else 'Донецк',
+                    'phone': extract_phone(text) if text else '',
+                    'photo_url': photo_url,
+                    'photo_urls': json.dumps(photo_urls),
+                    'post_link': post_link,
+                    'forwarded_from': forwarded_from,
+                    'created_at': datetime.now().isoformat()
+                }
+                
+                new_ads.append(ad)
+                max_id = max(max_id, message_id)
+                saved_count += 1
+                print(f"  ✅ Добавлено (ID: {message_id})")
+        
+        print(f"\n📊 Итоговая статистика:")
         print(f"  Всего обновлений: {len(results)}")
+        print(f"  Альбомов: {len(groups)}")
+        print(f"  Одиночных: {len(single_messages)}")
         print(f"  Новых объявлений: {saved_count}")
         
-        # 6. Сохраняем в Supabase
+        # 9. Сохраняем в Supabase
         if new_ads:
             print(f"\n💾 Сохраняем {len(new_ads)} объявлений...")
             url = f"{SUPABASE_URL}/rest/v1/ads"
@@ -275,7 +366,7 @@ def get_channel_updates():
                 print(f"⚠️ Ошибка сохранения: {response.status_code}")
                 print(f"Response: {response.text[:200]}")
             
-            # 7. Обновляем last_message_id
+            # 10. Обновляем last_message_id
             print("🔄 Обновляем состояние парсера...")
             url = f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1"
             update_data = {
