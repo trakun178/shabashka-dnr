@@ -4,8 +4,8 @@
   "description": "Объявления и услуги Донецк, Макеевка, Горловка, Мариуполь",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f5f5f5",
-  "theme_color": "#667eea",
+  "background_color": "#0a0a0a",
+  "theme_color": "#FFB800",
   "icons": [
     {
       "src": "images/web-app-manifest-192x192.png",
@@ -22,11 +22,6 @@
     {
       "src": "images/favicon-96x96.png",
       "sizes": "96x96",
-      "type": "image/png"
-    },
-    {
-      "src": "images/apple-touch-icon.png",
-      "sizes": "180x180",
       "type": "image/png"
     }
   ]
