@@ -90,27 +90,16 @@
     <link rel="preconnect" href="https://images.weserv.nl" />
     <link rel="dns-prefetch" href="https://images.weserv.nl" />
 
-    <!-- Preload логотипа -->
-    <link rel="preload" href="images/logo.png" as="image" />
-    <link rel="preload" href="images/logo.webp" as="image" type="image/webp" />
-
     <!-- Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <!-- Font Awesome with preload -->
+    <!-- Font Awesome -->
     <link
-      rel="preload"
+      rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-      as="style"
-      onload="this.onload = null"
     />
-    <noscript
-      ><link
-        rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-    /></noscript>
 
-    <!-- Structured Data (JSON-LD) -->
+    <!-- Structured Data -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -128,28 +117,6 @@
           "addressRegion": "Донецкая область",
           "addressCountry": "UA"
         }
-      }
-    </script>
-
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "LocalBusiness",
-        "name": "Шабашка DNR - Объявления",
-        "image": "https://shabashka.sofoniya.ru/images/logo.png",
-        "url": "https://shabashka.sofoniya.ru",
-        "telephone": "",
-        "address": {
-          "@type": "PostalAddress",
-          "addressRegion": "Донецкая область",
-          "addressLocality": "Донецк",
-          "addressCountry": "UA"
-        },
-        "areaServed": {
-          "@type": "State",
-          "name": "Донецкая область"
-        },
-        "description": "Объявления о работе, ремонте, строительстве в Донецке, Макеевке, Горловке, Мариуполе"
       }
     </script>
 
@@ -172,6 +139,7 @@
         line-height: 1.6;
       }
 
+      /* ===== ШАПКА ===== */
       header {
         background: #1a1a1a;
         color: #f0f0f0;
@@ -251,6 +219,7 @@
         color: #cccccc;
       }
 
+      /* ===== КОНТЕЙНЕР ===== */
       .container {
         max-width: 900px;
         margin: 0 auto;
@@ -288,6 +257,7 @@
         min-width: 200px;
       }
 
+      /* ===== КАРТОЧКИ ОБЪЯВЛЕНИЙ ===== */
       .ads-list {
         display: flex;
         flex-direction: column;
@@ -318,7 +288,6 @@
         object-fit: contain;
         background: #f5f5f5;
         display: block;
-        border-bottom: 1px solid #ddd;
       }
 
       .ad-photos {
@@ -416,6 +385,7 @@
         box-shadow: 0 4px 12px rgba(255, 184, 0, 0.4);
       }
 
+      /* ===== РЕКЛАМНЫЙ БАННЕР ===== */
       .ad-banner {
         background: linear-gradient(135deg, #ff4444 0%, #ffffff 100%);
         color: #0d47a1;
@@ -457,7 +427,7 @@
         box-shadow: 0 4px 12px rgba(255, 184, 0, 0.5);
       }
 
-      /* Pagination */
+      /* ===== ПАГИНАЦИЯ ===== */
       .pagination {
         display: flex;
         justify-content: center;
@@ -501,6 +471,7 @@
         margin-top: 1rem;
       }
 
+      /* ===== ПОДВАЛ ===== */
       footer {
         background: #1a1a1a;
         color: #cccccc;
@@ -552,6 +523,15 @@
         font-weight: 600;
       }
 
+      .footer-text a {
+        color: #ffb800;
+        text-decoration: none;
+      }
+
+      .footer-text a:hover {
+        text-decoration: underline;
+      }
+
       .loading {
         text-align: center;
         padding: 3rem;
@@ -567,6 +547,7 @@
         font-weight: 600;
       }
 
+      /* ===== АДАПТИВНОСТЬ ===== */
       @media (max-width: 768px) {
         .header-content {
           flex-direction: column;
@@ -575,6 +556,7 @@
         .header-ad {
           max-width: 100%;
           min-width: auto;
+          width: 100%;
         }
 
         .header-center h1 {
@@ -610,15 +592,11 @@
     </style>
   </head>
   <body>
-    <picture>
-      <source srcset="images/logo.webp" type="image/webp" />
-      <img src="images/logo.png" alt="Шабашка DNR" loading="eager" />
-    </picture>
     <header>
       <div class="header-content">
         <div class="header-ad">
           <div class="ad-label">Реклама</div>
-          <div class="ad-title">Мастер на час</div>
+          <div class="ad-title">🔧 Мастер на час</div>
           <div class="ad-desc">Ремонт любой сложности. Звоните!</div>
         </div>
 
@@ -736,10 +714,6 @@
           Ремонт квартир, сантехнические работы, электрика, строительство,
           грузчики, уборка и многие другие услуги.
         </p>
-        <p class="footer-text">
-          <a href="/sitemap.xml" style="color: #ffb800">Карта сайта</a> |
-          <a href="/robots.txt" style="color: #ffb800">robots.txt</a>
-        </p>
 
         <div class="social-links">
           <a
@@ -759,7 +733,7 @@
             <i class="fab fa-telegram-plane"></i>
           </a>
           <a
-            href="https://max.ru/join/YIws3_0VQImS34uLVJiloEMMZTDiyC0nc_ES8yrxKoI"
+            href="https://max.kz"
             target="_blank"
             rel="noopener noreferrer"
             title="MAX"
@@ -767,6 +741,10 @@
             <i class="fas fa-briefcase"></i>
           </a>
         </div>
+        <p class="footer-text">
+          <a href="/sitemap.xml">Карта сайта</a> |
+          <a href="/robots.txt">robots.txt</a>
+        </p>
         <p class="footer-text">
           © 2026 Шабашка DNR - Услуги и объявления<br />
           Донецк, Макеевка, Горловка, Мариуполь, Донецкая область
@@ -847,10 +825,8 @@
 
         let html = "";
 
-        // Previous button
         html += `<button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? "disabled" : ""}>← Назад</button>`;
 
-        // Page numbers
         const maxVisible = 5;
         let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
         let endPage = Math.min(totalPages, startPage + maxVisible - 1);
@@ -877,13 +853,11 @@
           html += `<button onclick="changePage(${totalPages})">${totalPages}</button>`;
         }
 
-        // Next button
         html += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? "disabled" : ""}>Вперед →</button>`;
 
         paginationDiv.innerHTML = html;
         infoDiv.innerHTML = `Страница ${currentPage} из ${totalPages} (Всего: ${filteredAds.length} объявлений)`;
 
-        // Scroll to top
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
 
@@ -965,7 +939,7 @@
                             <h3 class="ad-title">${title}</h3>
                             <p class="ad-description">${description}</p>
                             <div class="ad-meta">
-                                <span> ${ad.city || "Донецк"}</span>
+                                <span>📍 ${ad.city || "Донецк"}</span>
                                 ${ad.phone ? `<span>📞 ${ad.phone}</span>` : ""}
                                 ${ad.forwarded_from ? `<span>↪️ ${ad.forwarded_from}</span>` : ""}
                                 <span>🕐 ${new Date(ad.created_at).toLocaleString("ru-RU")}</span>
@@ -1018,7 +992,6 @@
         .getElementById("searchInput")
         .addEventListener("input", filterAds);
 
-      // Load on start
       loadAds();
     </script>
   </body>
