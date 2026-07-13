@@ -90,6 +90,10 @@
     <link rel="preconnect" href="https://images.weserv.nl" />
     <link rel="dns-prefetch" href="https://images.weserv.nl" />
 
+    <!-- Preload логотипа -->
+    <link rel="preload" href="images/logo.png" as="image" />
+    <link rel="preload" href="images/logo.webp" as="image" type="image/webp" />
+
     <!-- Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -309,30 +313,35 @@
 
       .ad-image {
         width: 100%;
+        height: auto;
         max-height: 600px;
         object-fit: contain;
         background: #f5f5f5;
         display: block;
+        border-bottom: 1px solid #ddd;
       }
 
       .ad-photos {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
         gap: 0.5rem;
         padding: 0.5rem;
+        background: #f5f5f5;
       }
 
       .ad-photo {
         width: 100%;
-        max-height: 400px;
+        height: 300px;
         object-fit: cover;
         border-radius: 8px;
         cursor: pointer;
         transition: transform 0.2s;
+        border: 2px solid #ffb800;
       }
 
       .ad-photo:hover {
         transform: scale(1.02);
+        box-shadow: 0 4px 12px rgba(255, 184, 0, 0.3);
       }
 
       .ad-content {
@@ -601,6 +610,10 @@
     </style>
   </head>
   <body>
+    <picture>
+      <source srcset="images/logo.webp" type="image/webp" />
+      <img src="images/logo.png" alt="Шабашка DNR" loading="eager" />
+    </picture>
     <header>
       <div class="header-content">
         <div class="header-ad">
@@ -723,6 +736,10 @@
           Ремонт квартир, сантехнические работы, электрика, строительство,
           грузчики, уборка и многие другие услуги.
         </p>
+        <p class="footer-text">
+          <a href="/sitemap.xml" style="color: #ffb800">Карта сайта</a> |
+          <a href="/robots.txt" style="color: #ffb800">robots.txt</a>
+        </p>
 
         <div class="social-links">
           <a
@@ -742,7 +759,7 @@
             <i class="fab fa-telegram-plane"></i>
           </a>
           <a
-            href="https://max.kz"
+            href="https://max.ru/join/YIws3_0VQImS34uLVJiloEMMZTDiyC0nc_ES8yrxKoI"
             target="_blank"
             rel="noopener noreferrer"
             title="MAX"
