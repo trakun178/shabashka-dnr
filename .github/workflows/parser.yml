@@ -1,10 +1,10 @@
-name: Telegram Parser
-
+name: Parser
 on:
   schedule:
-    - cron: "*/15 * * * *" # Каждые 15 минут
+    # Запуск каждые 15 минут с 03:00 до 22:00 UTC (06:00 - 01:00 MSK)
+    - cron: '*/15 3-22 * * *'
   workflow_dispatch: # Ручной запуск
-
+  
 jobs:
   parse:
     runs-on: ubuntu-latest
