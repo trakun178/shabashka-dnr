@@ -3,18 +3,66 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Шабашка DNR - Объявления Донецк, Макеевка</title>
 
-    <!-- Supabase библиотека -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- SEO Meta Tags -->
+    <title>
+      Шабашка DNR - Работа, Ремонт, Строительство в Донецке | Мастера и бригады
+    </title>
+    <meta
+      name="description"
+      content="Шабашка DNR - объявления о работе, ремонте, строительстве в Донецке, Макеевке, Горловке, Мариуполе. Мастера, бригады, частные объявления. Ремонт квартир, сантехника, электрика."
+    />
+    <meta
+      name="keywords"
+      content="шабашка, работа Донецк, ремонт Донецк, строительство Донецк, мастера Донецк, бригада ремонт, сантехника, электрика, шабашка DNR, частные объявления, подработка"
+    />
+    <meta name="author" content="Шабашка DNR" />
+    <meta name="robots" content="index, follow" />
+    <meta http-equiv="Cache-Control" content="max-age=86400" />
 
-    <!-- Иконки Font Awesome -->
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    <!-- Geo Tags -->
+    <meta name="geo.region" content="UA-14" />
+    <meta name="geo.placename" content="Донецк" />
+    <meta name="geo.position" content="48.015883;37.802843" />
+    <meta name="ICBM" content="48.015883, 37.802843" />
+
+    <!-- Open Graph -->
+    <meta
+      property="og:title"
+      content="Шабашка DNR - Работа и Ремонт в Донецке | Мастера и Бригады"
+    />
+    <meta
+      property="og:description"
+      content="Объявления о работе, ремонте, строительстве в Донецке, Макеевке, Горловке, Мариуполе. Частные мастера и бригады."
+    />
+    <meta
+      property="og:image"
+      content="https://shabashka.sofoniya.ru/images/logo.png"
+    />
+    <meta property="og:url" content="https://shabashka.sofoniya.ru" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ru_RU" />
+    <meta property="og:site_name" content="Шабашка DNR" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="Шабашка DNR - Работа и Ремонт в Донецке"
+    />
+    <meta
+      name="twitter:description"
+      content="Объявления о работе, ремонте, строительстве в Донецке и области"
+    />
+    <meta
+      name="twitter:image"
+      content="https://shabashka.sofoniya.ru/images/logo.png"
     />
 
-    <!-- Фавиконы -->
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://shabashka.sofoniya.ru" />
+
+    <!-- Favicon -->
     <link
       rel="icon"
       type="image/png"
@@ -34,19 +82,72 @@
     />
     <link rel="manifest" href="manifest.json" />
     <link rel="shortcut icon" href="images/favicon.ico" />
-    <meta name="theme-color" content="#1a1a1a" />
+    <meta name="theme-color" content="#FFB800" />
 
-    <meta
-      name="description"
-      content="Объявления и услуги Донецк, Макеевка, Горловка, Мариуполь"
+    <!-- Preconnect -->
+    <link rel="preconnect" href="https://krftmuyrshvgbdsstidf.supabase.co" />
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+    <link rel="preconnect" href="https://images.weserv.nl" />
+    <link rel="dns-prefetch" href="https://images.weserv.nl" />
+
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Font Awesome with preload -->
+    <link
+      rel="preload"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      as="style"
+      onload="this.onload = null"
     />
-    <meta property="og:title" content="Шабашка DNR - Объявления" />
-    <meta
-      property="og:description"
-      content="Объявления и услуги Донецк, Макеевка, Горловка, Мариуполь"
-    />
-    <meta property="og:image" content="images/icon-512x512.png" />
-    <meta property="og:url" content="https://shabashka.sofoniya.ru" />
+    <noscript
+      ><link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    /></noscript>
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Шабашка DNR",
+        "url": "https://shabashka.sofoniya.ru",
+        "description": "Объявления о работе, ремонте и строительстве в Донецке и области",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://shabashka.sofoniya.ru/?search={search_term_string}",
+          "query-input": "required name=search_term_string"
+        },
+        "address": {
+          "@type": "PostalAddress",
+          "addressRegion": "Донецкая область",
+          "addressCountry": "UA"
+        }
+      }
+    </script>
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "LocalBusiness",
+        "name": "Шабашка DNR - Объявления",
+        "image": "https://shabashka.sofoniya.ru/images/logo.png",
+        "url": "https://shabashka.sofoniya.ru",
+        "telephone": "",
+        "address": {
+          "@type": "PostalAddress",
+          "addressRegion": "Донецкая область",
+          "addressLocality": "Донецк",
+          "addressCountry": "UA"
+        },
+        "areaServed": {
+          "@type": "State",
+          "name": "Донецкая область"
+        },
+        "description": "Объявления о работе, ремонте, строительстве в Донецке, Макеевке, Горловке, Мариуполе"
+      }
+    </script>
 
     <style>
       * {
@@ -57,12 +158,14 @@
 
       body {
         font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+          Cantarell, sans-serif;
         background-color: #d4d4d4;
         color: #1a1a1a;
         display: flex;
         flex-direction: column;
         min-height: 100vh;
+        line-height: 1.6;
       }
 
       header {
@@ -108,7 +211,7 @@
       .header-ad .ad-title {
         font-size: 1rem;
         margin-bottom: 0.3rem;
-        color: #0d47a1; /* Тёмно-синий вместо красного */
+        color: #0d47a1;
         font-weight: 800;
       }
 
@@ -345,6 +448,50 @@
         box-shadow: 0 4px 12px rgba(255, 184, 0, 0.5);
       }
 
+      /* Pagination */
+      .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 2rem;
+        flex-wrap: wrap;
+      }
+
+      .pagination button {
+        padding: 0.75rem 1.25rem;
+        border: 2px solid #ffb800;
+        background: white;
+        color: #1a1a1a;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 700;
+        transition: all 0.2s;
+      }
+
+      .pagination button:hover:not(:disabled) {
+        background: linear-gradient(135deg, #ffb800 0%, #ff8c00 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(255, 184, 0, 0.3);
+      }
+
+      .pagination button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .pagination button.active {
+        background: linear-gradient(135deg, #ffb800 0%, #ff8c00 100%);
+        color: #000;
+      }
+
+      .pagination-info {
+        text-align: center;
+        color: #555;
+        font-weight: 600;
+        margin-top: 1rem;
+      }
+
       footer {
         background: #1a1a1a;
         color: #cccccc;
@@ -357,6 +504,17 @@
         max-width: 900px;
         margin: 0 auto;
         text-align: center;
+      }
+
+      .footer-content h3 {
+        color: #ffb800;
+        margin-bottom: 1rem;
+        font-size: 1.3rem;
+      }
+
+      .footer-content p {
+        margin-bottom: 0.5rem;
+        line-height: 1.8;
       }
 
       .social-links {
@@ -430,6 +588,15 @@
         .ad-image {
           max-height: 400px;
         }
+
+        .pagination {
+          gap: 0.3rem;
+        }
+
+        .pagination button {
+          padding: 0.6rem 1rem;
+          font-size: 0.9rem;
+        }
       }
     </style>
   </head>
@@ -438,19 +605,22 @@
       <div class="header-content">
         <div class="header-ad">
           <div class="ad-label">Реклама</div>
-          <div class="ad-title">🔧 Мастер на час</div>
+          <div class="ad-title">Мастер на час</div>
           <div class="ad-desc">Ремонт любой сложности. Звоните!</div>
         </div>
 
         <div class="header-center">
-          <img src="images/logo.png" alt="Шабашка DNR" />
-          <h1>Шабашка DNR</h1>
-          <p>Объявления Донецк, Макеевка, Горловка, Мариуполь</p>
+          <img
+            src="images/logo.png"
+            alt="Шабашка DNR - Работа и Ремонт в Донецке"
+          />
+          <h1>🔧 Шабашка DNR</h1>
+          <p>Работа, ремонт, строительство в Донецке и области</p>
         </div>
 
         <div class="header-ad">
           <div class="ad-label">Реклама</div>
-          <div class="ad-title">⚡ Электрик 24/7</div>
+          <div class="ad-title">Электрик 24/7</div>
           <div class="ad-desc">Быстро, качественно, недорого</div>
         </div>
       </div>
@@ -458,7 +628,7 @@
 
     <div class="container">
       <div class="ad-banner" id="adBanner" style="display: none">
-        <h3>Разместите свою рекламу здесь!</h3>
+        <h3>📢 Разместите свою рекламу здесь!</h3>
         <p>Ваше объявление увидят тысячи людей</p>
         <a
           href="https://t.me/dnrsabbath"
@@ -531,10 +701,29 @@
       <div id="adsContainer" class="ads-list">
         <div class="loading">Загрузка объявлений...</div>
       </div>
+
+      <div id="pagination" class="pagination"></div>
+      <div id="paginationInfo" class="pagination-info"></div>
     </div>
 
     <footer>
       <div class="footer-content">
+        <h3>Шабашка DNR - Работа и Ремонт в Донецкой области</h3>
+        <p>
+          <strong
+            >Ищете мастеров для ремонта, строительства или другой
+            работы?</strong
+          >
+        </p>
+        <p>
+          У нас вы найдете частных мастеров и бригады в Донецке, Макеевке,
+          Горловке, Мариуполе и других городах Донецкой области.
+        </p>
+        <p>
+          Ремонт квартир, сантехнические работы, электрика, строительство,
+          грузчики, уборка и многие другие услуги.
+        </p>
+
         <div class="social-links">
           <a
             href="https://vk.com/dnrsabbath"
@@ -563,7 +752,7 @@
         </div>
         <p class="footer-text">
           © 2026 Шабашка DNR - Услуги и объявления<br />
-          Донецк, Макеевка, Горловка, Мариуполь
+          Донецк, Макеевка, Горловка, Мариуполь, Донецкая область
         </p>
       </div>
     </footer>
@@ -579,6 +768,9 @@
       );
 
       let allAds = [];
+      let filteredAds = [];
+      let currentPage = 1;
+      const adsPerPage = 50;
 
       async function loadAds() {
         try {
@@ -590,7 +782,9 @@
           if (error) throw error;
 
           allAds = data || [];
-          renderAds(allAds);
+          filteredAds = [...allAds];
+          renderPagination();
+          renderCurrentPage();
           checkPaidAds();
         } catch (error) {
           console.error("Ошибка загрузки:", error);
@@ -623,6 +817,76 @@
         }
       }
 
+      function renderPagination() {
+        const totalPages = Math.ceil(filteredAds.length / adsPerPage);
+        const paginationDiv = document.getElementById("pagination");
+        const infoDiv = document.getElementById("paginationInfo");
+
+        if (totalPages <= 1) {
+          paginationDiv.innerHTML = "";
+          infoDiv.innerHTML = `Всего объявлений: ${filteredAds.length}`;
+          return;
+        }
+
+        let html = "";
+
+        // Previous button
+        html += `<button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? "disabled" : ""}>← Назад</button>`;
+
+        // Page numbers
+        const maxVisible = 5;
+        let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+        let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+
+        if (endPage - startPage < maxVisible - 1) {
+          startPage = Math.max(1, endPage - maxVisible + 1);
+        }
+
+        if (startPage > 1) {
+          html += `<button onclick="changePage(1)">1</button>`;
+          if (startPage > 2) {
+            html += `<span style="color: #666;">...</span>`;
+          }
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+          html += `<button onclick="changePage(${i})" class="${i === currentPage ? "active" : ""}">${i}</button>`;
+        }
+
+        if (endPage < totalPages) {
+          if (endPage < totalPages - 1) {
+            html += `<span style="color: #666;">...</span>`;
+          }
+          html += `<button onclick="changePage(${totalPages})">${totalPages}</button>`;
+        }
+
+        // Next button
+        html += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? "disabled" : ""}>Вперед →</button>`;
+
+        paginationDiv.innerHTML = html;
+        infoDiv.innerHTML = `Страница ${currentPage} из ${totalPages} (Всего: ${filteredAds.length} объявлений)`;
+
+        // Scroll to top
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      function changePage(page) {
+        const totalPages = Math.ceil(filteredAds.length / adsPerPage);
+        if (page < 1 || page > totalPages) return;
+
+        currentPage = page;
+        renderCurrentPage();
+        renderPagination();
+      }
+
+      function renderCurrentPage() {
+        const start = (currentPage - 1) * adsPerPage;
+        const end = start + adsPerPage;
+        const adsToShow = filteredAds.slice(start, end);
+
+        renderAds(adsToShow);
+      }
+
       function renderAds(ads) {
         const container = document.getElementById("adsContainer");
 
@@ -631,6 +895,8 @@
             '<div class="no-results">Объявления не найдены</div>';
           return;
         }
+
+        const photoProxy = "https://images.weserv.nl/?url=";
 
         container.innerHTML = ads
           .map((ad) => {
@@ -658,11 +924,17 @@
             let photos_html = "";
             if (photo_urls.length > 0) {
               if (photo_urls.length === 1) {
-                photos_html = `<img src="${photo_urls[0]}" class="ad-image" alt="${title}">`;
+                const photoUrl = photo_urls[0].includes("telegram.org")
+                  ? photoProxy + encodeURIComponent(photo_urls[0])
+                  : photo_urls[0];
+                photos_html = `<img src="${photoUrl}" class="ad-image" alt="${title}" loading="lazy">`;
               } else {
                 photos_html = '<div class="ad-photos">';
                 photo_urls.forEach((url, idx) => {
-                  photos_html += `<img src="${url}" class="ad-photo" alt="${title} ${idx + 1}" onclick="window.open('${url}', '_blank')">`;
+                  const photoUrl = url.includes("telegram.org")
+                    ? photoProxy + encodeURIComponent(url)
+                    : url;
+                  photos_html += `<img src="${photoUrl}" class="ad-photo" alt="${title} ${idx + 1}" onclick="window.open('${url}', '_blank')" loading="lazy">`;
                 });
                 photos_html += "</div>";
               }
@@ -676,7 +948,7 @@
                             <h3 class="ad-title">${title}</h3>
                             <p class="ad-description">${description}</p>
                             <div class="ad-meta">
-                                <span>📍 ${ad.city || "Донецк"}</span>
+                                <span> ${ad.city || "Донецк"}</span>
                                 ${ad.phone ? `<span>📞 ${ad.phone}</span>` : ""}
                                 ${ad.forwarded_from ? `<span>↪️ ${ad.forwarded_from}</span>` : ""}
                                 <span>🕐 ${new Date(ad.created_at).toLocaleString("ru-RU")}</span>
@@ -696,25 +968,27 @@
           .getElementById("searchInput")
           .value.toLowerCase();
 
-        let filtered = allAds;
+        filteredAds = allAds;
 
         if (category) {
-          filtered = filtered.filter((ad) => ad.category === category);
+          filteredAds = filteredAds.filter((ad) => ad.category === category);
         }
 
         if (city) {
-          filtered = filtered.filter((ad) => ad.city === city);
+          filteredAds = filteredAds.filter((ad) => ad.city === city);
         }
 
         if (search) {
-          filtered = filtered.filter(
+          filteredAds = filteredAds.filter(
             (ad) =>
               (ad.title && ad.title.toLowerCase().includes(search)) ||
               (ad.description && ad.description.toLowerCase().includes(search)),
           );
         }
 
-        renderAds(filtered);
+        currentPage = 1;
+        renderPagination();
+        renderCurrentPage();
       }
 
       document
@@ -727,6 +1001,7 @@
         .getElementById("searchInput")
         .addEventListener("input", filterAds);
 
+      // Load on start
       loadAds();
     </script>
   </body>
