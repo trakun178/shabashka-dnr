@@ -1,4 +1,4 @@
-requests==4.4.0
-supabase==2.3.2
-python-dotenv==1.0.0
-vk-api==11.9.9
+requests
+supabase
+python-dotenv
+vk-api
