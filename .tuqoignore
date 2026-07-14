@@ -1,0 +1,9 @@
+.github/
+parser/
+vercel.json
+wrangler.toml
+.env.local
+README.md
+.gitignore
+.vercelignore
+parser/.env

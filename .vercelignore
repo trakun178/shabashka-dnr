@@ -3,3 +3,4 @@ parser/
 .env.local
 wrangler.toml
 README.md
+parser/.env
