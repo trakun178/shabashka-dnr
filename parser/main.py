@@ -10,11 +10,11 @@ from dotenv import load_dotenv
 
 env_path = os.path.join(os.path.dirname(__file__), '.env')
 if os.path.exists(env_path):
-    print(f" Загружаем переменные из .env файла...")
+    print(f"📁 Загружаем переменные из .env файла...")
     load_dotenv(env_path)
     print(f"   Путь: {env_path}")
 else:
-    print(f"️ .env файл не найден, используем GitHub Secrets...")
+    print(f"ℹ️ .env файл не найден, используем GitHub Secrets...")
 
 print(f"\n🔍 Проверка переменных окружения:")
 print("=" * 50)
@@ -25,22 +25,16 @@ SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')
 VK_TOKEN = os.environ.get('VK_TOKEN', '')
 VK_GROUP_ID = os.environ.get('VK_GROUP_ID', '')
 
-# Прокси для Telegram (опционально)
-TELEGRAM_PROXY = os.environ.get('TELEGRAM_PROXY', '')
-
 print(f"  BOT_TOKEN: {'✅ Установлен' if BOT_TOKEN else '❌ НЕ установлен'}")
 print(f"  SUPABASE_URL: {'✅ Установлен' if SUPABASE_URL else '❌ НЕ установлен'}")
 print(f"  SUPABASE_KEY: {'✅ Установлен' if SUPABASE_KEY else '❌ НЕ установлен'}")
 print(f"  VK_TOKEN: {'✅ Установлен' if VK_TOKEN else '❌ НЕ установлен'}")
 print(f"  VK_GROUP_ID: {'✅ Установлен' if VK_GROUP_ID else '❌ НЕ установлен'}")
-print(f"  TELEGRAM_PROXY: {'✅ Установлен' if TELEGRAM_PROXY else '⚠️ Не установлен (прямое подключение)'}")
 
 if VK_TOKEN:
     print(f"  VK_TOKEN (первые 20 симв): {VK_TOKEN[:20]}...")
 if VK_GROUP_ID:
     print(f"  VK_GROUP_ID: {VK_GROUP_ID}")
-if TELEGRAM_PROXY:
-    print(f"  TELEGRAM_PROXY: {TELEGRAM_PROXY[:30]}...")
 
 print("=" * 50)
 
@@ -52,7 +46,7 @@ if VK_TOKEN and VK_GROUP_ID:
         vk_uploader = VKUploader(VK_TOKEN, VK_GROUP_ID)
         print(f"✅ VK uploader инициализирован (группа: {VK_GROUP_ID})")
     except Exception as e:
-        print(f" Ошибка инициализации VK: {e}")
+        print(f"❌ Ошибка инициализации VK: {e}")
         import traceback
         traceback.print_exc()
         vk_uploader = None
@@ -72,34 +66,11 @@ HEADERS = {
     "Prefer": "return=representation"
 }
 
-# Настройка прокси для requests
-def get_session_with_proxy():
-    """Создаём сессию с прокси (если указан)"""
-    session = requests.Session()
-    
-    if TELEGRAM_PROXY:
-        proxies = {
-            'http': TELEGRAM_PROXY,
-            'https': TELEGRAM_PROXY
-        }
-        session.proxies.update(proxies)
-        print(f"  ✅ Прокси настроен: {TELEGRAM_PROXY[:40]}...")
-    
-    # Добавляем заголовки
-    session.headers.update({
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    })
-    
-    return session
-
-def get_file_url(file_id, session=None):
+def get_file_url(file_id):
     """Получаем URL файла по file_id"""
     try:
-        if session is None:
-            session = get_session_with_proxy()
-            
         file_url = f'https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}'
-        file_response = session.get(file_url, timeout=15)
+        file_response = requests.get(file_url)
         file_data = file_response.json()
         
         if file_data.get('ok'):
@@ -178,11 +149,11 @@ def smart_title(text, max_length=70):
 def get_channel_updates():
     """Основная функция парсера"""
     print("\n" + "=" * 50)
-    print(" Запуск парсера Telegram канала")
+    print("🚀 Запуск парсера Telegram канала")
     print("=" * 50)
     
     # 1. Получаем last_message_id из Supabase
-    print("📥 Получаем последнее состояние парсера...")
+    print(" Получаем последнее состояние парсера...")
     url = f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1"
     response = requests.get(url, headers=HEADERS)
     
@@ -195,7 +166,7 @@ def get_channel_updates():
     last_id = data[0]['last_message_id'] if data else 0
     
     # 2. Проверяем реальное последнее сообщение в базе ads
-    print(" Проверяем последние сообщения в базе ads...")
+    print("🔍 Проверяем последние сообщения в базе ads...")
     ads_url = f"{SUPABASE_URL}/rest/v1/ads?order=tg_message_id.desc&limit=1"
     ads_response = requests.get(ads_url, headers=HEADERS)
     
@@ -213,10 +184,7 @@ def get_channel_updates():
     
     print(f"✅ Будем искать сообщения > {last_id}")
     
-    # 4. Создаём сессию с прокси
-    session = get_session_with_proxy()
-    
-    # 5. Получаем ВСЕ доступные обновления из Telegram
+    # 4. Получаем ВСЕ доступные обновления из Telegram
     print(f"\n📡 Получаем обновления из Telegram...")
     telegram_url = f'https://api.telegram.org/bot{BOT_TOKEN}/getUpdates'
     params = {
@@ -233,10 +201,11 @@ def get_channel_updates():
         try:
             print(f"  Попытка {attempt + 1} из {max_retries}...")
             
-            response = session.get(
+            response = requests.get(
                 telegram_url, 
                 params=params, 
-                timeout=60
+                timeout=60,
+                headers={'User-Agent': 'Mozilla/5.0'}
             )
             
             if response.status_code == 200:
@@ -248,7 +217,7 @@ def get_channel_updates():
                     print(f"  ❌ Telegram API error: {data}")
                     return
             else:
-                print(f"  ⚠️ Ошибка {response.status_code}: {response.text[:100]}")
+                print(f"  ️ Ошибка {response.status_code}: {response.text[:100]}")
                 if attempt < max_retries - 1:
                     print(f"   Ждём 10 секунд перед повторной попыткой...")
                     time.sleep(10)
@@ -260,15 +229,10 @@ def get_channel_updates():
                 time.sleep(15)
             continue
             
-        except requests.exceptions.ProxyError as e:
-            print(f"  ❌ Ошибка прокси: {str(e)[:100]}")
-            print(f"\n💡 Проверьте прокси или отключите его")
-            return
-            
         except requests.exceptions.ConnectionError as e:
             print(f"  ❌ Ошибка подключения: {str(e)[:100]}")
             print(f"\n💡 Возможные причины:")
-            print(f"   1. Telegram заблокирован - настройте TELEGRAM_PROXY")
+            print(f"   1. Telegram заблокирован - нужен VPN/прокси")
             print(f"   2. Проблемы с интернетом")
             print(f"   3. Неправильный BOT_TOKEN")
             if attempt < max_retries - 1:
@@ -277,26 +241,19 @@ def get_channel_updates():
             continue
             
         except Exception as e:
-            print(f"  ❌ Неожиданная ошибка: {e}")
+            print(f"   Неожиданная ошибка: {e}")
             if attempt < max_retries - 1:
                 time.sleep(10)
             continue
     
     if data is None or not data.get('ok'):
         print(f"\n❌ Не удалось подключиться к Telegram после {max_retries} попыток")
-        print(f"\n💡 Попробуйте:")
-        print(f"   1. Добавить прокси в .env файл:")
-        print(f"      TELEGRAM_PROXY=socks5://127.0.0.1:9050")
-        print(f"   2. Или использовать HTTP прокси:")
-        print(f"      TELEGRAM_PROXY=http://user:pass@proxy:port")
-        print(f"   3. Включить VPN")
-        print(f"   4. Проверить BOT_TOKEN")
         return
     
     all_updates = data.get('result', [])
     print(f"📩 Получено {len(all_updates)} обновлений из Telegram")
     
-    # 6. Фильтруем ТОЛЬКО channel_post с message_id > last_id
+    # 5. Фильтруем ТОЛЬКО channel_post с message_id > last_id
     results = []
     for update in all_updates:
         if 'channel_post' in update:
@@ -313,8 +270,8 @@ def get_channel_updates():
     
     print(f"\n✅ Найдено {len(results)} новых сообщений для обработки")
     
-    # 7. ГРУППИРУЕМ сообщения по media_group_id
-    print("\n Группируем сообщения по альбомам...")
+    # 6. ГРУППИРУЕМ сообщения по media_group_id
+    print("\n📦 Группируем сообщения по альбомам...")
     groups = {}  # media_group_id -> список сообщений
     single_messages = []  # сообщения без media_group_id
     
@@ -326,23 +283,23 @@ def get_channel_updates():
             if media_group_id not in groups:
                 groups[media_group_id] = []
             groups[media_group_id].append(post)
-            print(f"   Сообщение {post['message_id']} в альбоме {media_group_id}")
+            print(f"  📸 Сообщение {post['message_id']} в альбоме {media_group_id}")
         else:
             single_messages.append(post)
-            print(f"   Одиночное сообщение {post['message_id']}")
+            print(f"  📝 Одиночное сообщение {post['message_id']}")
     
     print(f"\n📊 Статистика группировки:")
     print(f"  Альбомов: {len(groups)}")
     print(f"  Одиночных сообщений: {len(single_messages)}")
     
-    # 8. Обрабатываем альбомы (группы фото)
+    # 7. Обрабатываем альбомы (группы фото)
     new_ads = []
     max_id = last_id
     saved_count = 0
     vk_posts_count = 0
     
     for media_group_id, posts in groups.items():
-        print(f"\n Обрабатываем альбом {media_group_id} ({len(posts)} фото)...")
+        print(f"\n️ Обрабатываем альбом {media_group_id} ({len(posts)} фото)...")
         
         # Берём первое сообщение как основное
         main_post = posts[0]
@@ -371,65 +328,54 @@ def get_channel_updates():
                 photos = post['photo']
                 if photos:
                     largest_photo = photos[-1]
-                    photo_url = get_file_url(largest_photo['file_id'], session)
+                    photo_url = get_file_url(largest_photo['file_id'])
                     if photo_url:
                         photo_urls.append(photo_url)
             elif 'video' in post:
-                photo_url = get_file_url(post['video']['file_id'], session)
+                photo_url = get_file_url(post['video']['file_id'])
                 if photo_url:
                     photo_urls.append(photo_url)
             elif 'document' in post:
-                photo_url = get_file_url(post['document']['file_id'], session)
+                photo_url = get_file_url(post['document']['file_id'])
                 if photo_url:
                     photo_urls.append(photo_url)
         
-        print(f"   Найдено фото: {len(photo_urls)}")
+        print(f"  📸 Найдено фото: {len(photo_urls)}")
         
-        # Загружаем фото в VK (если есть uploader)
-        vk_photos = []
-        vk_post_url = None
+        # Загружаем фото в VK и сразу публикуем пост (если есть uploader)
+        vk_result = None
         
         if vk_uploader and photo_urls:
-            print(f"  📤 Загружаем {min(len(photo_urls), 10)} фото в VK...")
+            print(f"  📤 Загружаем {len(photo_urls)} фото в VK и публикуем пост...")
             
-            for photo_url in photo_urls[:10]:  # Максимум 10 фото
-                vk_photo = vk_uploader.upload_photo_from_url(photo_url)
-                if vk_photo:
-                    vk_photos.append(vk_photo)
-                    print(f"    ✅ Загружено: {vk_photo['url'][:50]}...")
-                else:
-                    print(f"    ❌ Не загружено")
-            
-            # Создаём пост в VK (если есть фото и текст)
+            # Формируем текст для VK
             post_link = f"https://t.me/{main_post.get('chat', {}).get('username', 'dnrsabbath')}/{message_id}"
+            vk_message = combined_text[:4096] if len(combined_text) > 4096 else combined_text
+            vk_message += f"\n\n📱 Источник: {post_link}"
             
-            if vk_photos and combined_text:
-                vk_message = combined_text[:4096] if len(combined_text) > 4096 else combined_text
-                vk_message += f"\n\n📱 Источник: {post_link}"
+            # Сразу публикуем пост с фото
+            vk_result = vk_uploader.post_with_photos(
+                message=vk_message,
+                photo_urls=photo_urls
+            )
+            
+            if vk_result:
+                vk_posts_count += 1
+                print(f"  ✅ Пост в VK: {vk_result['post_url']}")
                 
-                vk_post = vk_uploader.create_post(
-                    message=vk_message,
-                    photo_attachments=vk_photos,
-                    link=None
-                )
-                
-                if vk_post:
-                    vk_post_url = vk_post['url']
-                    vk_posts_count += 1
-                    print(f"  ✅ Пост в VK: {vk_post_url}")
-                    
-                    # Ждём 65 секунд между постами
-                    print("  ⏱️ Ожидание 65 секунд перед следующим постом...")
-                    time.sleep(65)
+                # Ждём 65 секунд между постами
+                print("  ⏱️ Ожидание 65 секунд перед следующим постом...")
+                time.sleep(65)
         
         # Создаём объявление
         if combined_text or photo_urls:
             title = smart_title(combined_text if combined_text else f"Объявление #{message_id}")
             description = combined_text if combined_text else "Объявление с медиа файлом"
             
-            # Используем VK URL для фото (если загрузили)
-            final_photo_urls = [p['url'] for p in vk_photos] if vk_photos else photo_urls
-            final_photo_url = final_photo_urls[0] if final_photo_urls else None
+            # Используем данные из VK
+            final_photo_url = vk_result['photo_url'] if vk_result else None
+            vk_post_url = vk_result['post_url'] if vk_result else None
+            final_photo_urls = [final_photo_url] if final_photo_url else photo_urls
             
             # Ссылка на пост в Telegram
             post_link = f"https://t.me/{main_post.get('chat', {}).get('username', 'dnrsabbath')}/{message_id}"
@@ -458,7 +404,7 @@ def get_channel_updates():
             saved_count += 1
             print(f"  ✅ Альбом добавлен (ID: {message_id}, фото: {len(final_photo_urls)})")
     
-    # 9. Обрабатываем одиночные сообщения
+    # 8. Обрабатываем одиночные сообщения
     for post in single_messages:
         print(f"\n🔄 Обрабатываем одиночное сообщение...")
         
@@ -505,65 +451,55 @@ def get_channel_updates():
             photos = post['photo']
             if photos:
                 largest_photo = photos[-1]
-                photo_url = get_file_url(largest_photo['file_id'], session)
+                photo_url = get_file_url(largest_photo['file_id'])
                 if photo_url:
                     photo_urls.append(photo_url)
         
         if 'video' in post:
             has_media = True
-            photo_url = get_file_url(post['video']['file_id'], session)
+            photo_url = get_file_url(post['video']['file_id'])
             if photo_url:
                 photo_urls.append(photo_url)
         
         if 'document' in post:
             has_media = True
-            photo_url = get_file_url(post['document']['file_id'], session)
+            photo_url = get_file_url(post['document']['file_id'])
             if photo_url:
                 photo_urls.append(photo_url)
         
-        # Загружаем фото в VK (если есть uploader)
-        vk_photos = []
-        vk_post_url = None
+        # Загружаем фото в VK и сразу публикуем пост (если есть uploader)
+        vk_result = None
         
         if vk_uploader and photo_urls:
-            print(f"   Загружаем {min(len(photo_urls), 10)} фото в VK...")
+            print(f"  📤 Загружаем {len(photo_urls)} фото в VK и публикуем пост...")
             
-            for photo_url in photo_urls[:10]:
-                vk_photo = vk_uploader.upload_photo_from_url(photo_url)
-                if vk_photo:
-                    vk_photos.append(vk_photo)
-                    print(f"    ✅ Загружено: {vk_photo['url'][:50]}...")
-                else:
-                    print(f"    ❌ Не загружено")
+            # Формируем текст для VK
+            vk_message = text[:4096] if len(text) > 4096 else text
+            vk_message += f"\n\n📱 Источник: {channel_username}"
             
-            # Создаём пост в VK
-            if vk_photos and text:
-                vk_message = text[:4096] if len(text) > 4096 else text
-                vk_message += f"\n\n📱 Источник: {channel_username}"
+            # Сразу публикуем пост с фото
+            vk_result = vk_uploader.post_with_photos(
+                message=vk_message,
+                photo_urls=photo_urls
+            )
+            
+            if vk_result:
+                vk_posts_count += 1
+                print(f"  ✅ Пост в VK: {vk_result['post_url']}")
                 
-                vk_post = vk_uploader.create_post(
-                    message=vk_message,
-                    photo_attachments=vk_photos,
-                    link=None
-                )
-                
-                if vk_post:
-                    vk_post_url = vk_post['url']
-                    vk_posts_count += 1
-                    print(f"  ✅ Пост в VK: {vk_post_url}")
-                    
-                    # Ждём 65 секунд между постами
-                    print("  ⏱️ Ожидание 65 секунд перед следующим постом...")
-                    time.sleep(65)
+                # Ждём 65 секунд между постами
+                print("  ️ Ожидание 65 секунд перед следующим постом...")
+                time.sleep(65)
         
         # Создаем объявление
         if text or has_media:
             title = smart_title(text if text else f"Объявление #{message_id}")
             description = text if text else "Объявление с медиа файлом"
             
-            # Используем VK URL для фото
-            final_photo_urls = [p['url'] for p in vk_photos] if vk_photos else photo_urls
-            final_photo_url = final_photo_urls[0] if final_photo_urls else None
+            # Используем данные из VK
+            final_photo_url = vk_result['photo_url'] if vk_result else None
+            vk_post_url = vk_result['post_url'] if vk_result else None
+            final_photo_urls = [final_photo_url] if final_photo_url else photo_urls
             
             ad = {
                 'tg_message_id': message_id,
@@ -592,7 +528,7 @@ def get_channel_updates():
     print(f"  Новых объявлений: {saved_count}")
     print(f"  Постов в VK: {vk_posts_count}")
     
-    # 10. Сохраняем в Supabase
+    # 9. Сохраняем в Supabase
     if new_ads:
         print(f"\n💾 Сохраняем {len(new_ads)} объявлений...")
         url = f"{SUPABASE_URL}/rest/v1/ads"
@@ -603,10 +539,10 @@ def get_channel_updates():
         if response.status_code in [200, 201]:
             print("✅ Объявления сохранены!")
         else:
-            print(f"⚠️ Ошибка сохранения: {response.status_code}")
+            print(f"️ Ошибка сохранения: {response.status_code}")
             print(f"Response: {response.text[:200]}")
         
-        # 11. Обновляем last_message_id
+        # 10. Обновляем last_message_id
         print("🔄 Обновляем состояние парсера...")
         url = f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1"
         update_data = {
