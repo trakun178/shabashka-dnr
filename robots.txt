@@ -1,0 +1,15 @@
+# Robots.txt for Shabashka DNR
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://shabashka.sofoniya.ru/sitemap.xml
+
+# Crawl-delay (для Яндекса)
+Crawl-delay: 1
+
+# Disallow admin and system files
+Disallow: /*.json$
+Disallow: /*.xml$
+Disallow: /manifest.json
+Disallow: /*.local$
