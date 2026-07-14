@@ -2,9 +2,9 @@ name: Parser
 on:
   schedule:
     # Запуск каждые 15 минут с 03:00 до 22:00 UTC (06:00 - 01:00 MSK)
-    - cron: '*/15 3-22 * * *'
+    - cron: "*/15 3-22 * * *"
   workflow_dispatch: # Ручной запуск
-  
+
 jobs:
   parse:
     runs-on: ubuntu-latest
@@ -27,6 +27,8 @@ jobs:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          VK_TOKEN: ${{ secrets.VK_TOKEN }}
+          VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
         run: |
           cd parser
           python main.py
