@@ -1,14 +1,12 @@
 name: Parser
 on:
   schedule:
-    # Запуск каждые 15 минут с 03:00 до 22:00 UTC (06:00 - 01:00 MSK)
     - cron: "*/15 3-22 * * *"
-  workflow_dispatch: # Ручной запуск
+  workflow_dispatch:
 
 jobs:
   parse:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v3
 
