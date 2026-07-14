@@ -58,17 +58,15 @@ class VKUploader:
                 
                 # Загружаем фото через API
                 try:
-                    # 1. Получаем URL для загрузки на стену группы
+                    # 1. Получаем URL для загрузки
                     upload_server = self._api_call('photos.getWallUploadServer', {
                         'group_id': self.group_id
                     })
                     
                     if not upload_server:
-                        print(f"     Не получен upload_server")
                         continue
                     
                     upload_url = upload_server['upload_url']
-                    print(f"    Получен upload_url")
                     
                     # 2. Загружаем файл
                     with open(temp_path, 'rb') as f:
@@ -77,18 +75,16 @@ class VKUploader:
                             files={'photo': f}
                         ).json()
                     
-                    print(f"    Upload response: {upload_response}")
-                    
                     if 'photo' not in upload_response:
                         print(f"    ❌ Ошибка загрузки файла")
                         continue
                     
-                    # 3. Сохраняем фото (ДОБАВЛЕН group_id!)
-                    saved = self._api_call('photos.saveWallPhoto', {
+                    # 3. Сохраняем фото ИСПРАВЛЕНО!
+                    saved = self._api_call('photos.save', {
                         'photo': upload_response['photo'],
                         'hash': upload_response.get('hash', ''),
                         'server': upload_response.get('server', 0),
-                        'group_id': self.group_id  # ВАЖНО!
+                        'group_id': self.group_id
                     })
                     
                     if saved and len(saved) > 0:
@@ -112,7 +108,7 @@ class VKUploader:
                 return None
             
             # Публикуем пост
-            print(f"  📝 Публикуем пост с {len(photo_attachments)} фото...")
+            print(f"   Публикуем пост с {len(photo_attachments)} фото...")
             
             attachments_str = ",".join(photo_attachments)
             
