@@ -15,7 +15,7 @@ class VKUploader:
             params = {}
         
         params['access_token'] = self.token
-        params['v'] = '5.131'  # Версия API
+        params['v'] = '5.131'
         
         url = f"{self.api_url}/{method}"
         response = requests.post(url, data=params)
@@ -29,7 +29,7 @@ class VKUploader:
         return data.get('response')
     
     def post_with_photos(self, message, photo_urls):
-        """Загружаем фото и публикуем пост через прямые HTTP запросы"""
+        """Загружаем фото и публикуем пост"""
         try:
             if not self.group_id:
                 print("  ❌ group_id не указан!")
@@ -48,7 +48,7 @@ class VKUploader:
                 response = requests.get(photo_url, headers=headers, timeout=15)
                 
                 if response.status_code != 200:
-                    print(f"    ️ Ошибка скачивания: {response.status_code}")
+                    print(f"    ⚠️ Ошибка скачивания: {response.status_code}")
                     continue
                 
                 # Сохраняем временно
@@ -58,16 +58,17 @@ class VKUploader:
                 
                 # Загружаем фото через API
                 try:
-                    # 1. Получаем URL для загрузки
+                    # 1. Получаем URL для загрузки на стену группы
                     upload_server = self._api_call('photos.getWallUploadServer', {
                         'group_id': self.group_id
                     })
                     
                     if not upload_server:
-                        print(f"    ❌ Не получен upload_server")
+                        print(f"     Не получен upload_server")
                         continue
                     
                     upload_url = upload_server['upload_url']
+                    print(f"    Получен upload_url")
                     
                     # 2. Загружаем файл
                     with open(temp_path, 'rb') as f:
@@ -76,15 +77,18 @@ class VKUploader:
                             files={'photo': f}
                         ).json()
                     
+                    print(f"    Upload response: {upload_response}")
+                    
                     if 'photo' not in upload_response:
                         print(f"    ❌ Ошибка загрузки файла")
                         continue
                     
-                    # 3. Сохраняем фото
+                    # 3. Сохраняем фото (ДОБАВЛЕН group_id!)
                     saved = self._api_call('photos.saveWallPhoto', {
                         'photo': upload_response['photo'],
                         'hash': upload_response.get('hash', ''),
-                        'server': upload_response.get('server', 0)
+                        'server': upload_response.get('server', 0),
+                        'group_id': self.group_id  # ВАЖНО!
                     })
                     
                     if saved and len(saved) > 0:
@@ -104,7 +108,7 @@ class VKUploader:
                         pass
             
             if not photo_attachments:
-                print(f"  ️ Не удалось загрузить фото")
+                print(f"  ⚠️ Не удалось загрузить фото")
                 return None
             
             # Публикуем пост
@@ -112,7 +116,6 @@ class VKUploader:
             
             attachments_str = ",".join(photo_attachments)
             
-            # Публикуем пост через API
             post = self._api_call('wall.post', {
                 'owner_id': group_owner_id,
                 'message': message[:4096],
