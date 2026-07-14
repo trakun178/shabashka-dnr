@@ -4,29 +4,37 @@ from datetime import datetime, timezone, timedelta
 import json
 import time
 
-# VK uploader
-from vk_uploader import VKUploader
-
-print(f" Подключение к Supabase...")
+print(f"🔧 Подключение к Supabase...")
 
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
 SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
 
-# VK конфигурация
-VK_TOKEN = os.environ.get('VK_TOKEN')
-VK_GROUP_ID = os.environ.get('VK_GROUP_ID')  # ID группы или пользователя (без минуса)
+# VK конфигурация - с подробным логированием
+VK_TOKEN = os.environ.get('VK_TOKEN', '')
+VK_GROUP_ID = os.environ.get('VK_GROUP_ID', '')
+
+print(f"\n🔍 Проверка переменных окружения:")
+print(f"  BOT_TOKEN: {'✅ Установлен' if BOT_TOKEN else '❌ НЕ установлен'}")
+print(f"  SUPABASE_URL: {'✅ Установлен' if SUPABASE_URL else ' НЕ установлен'}")
+print(f"  SUPABASE_KEY: {'✅ Установлен' if SUPABASE_KEY else '❌ НЕ установлен'}")
+print(f"  VK_TOKEN: {'✅ Установлен' if VK_TOKEN else '❌ НЕ установлен'}")
+print(f"  VK_GROUP_ID: {'✅ Установлен' if VK_GROUP_ID else '❌ НЕ установлен'}")
 
 # Инициализация VK uploader
 vk_uploader = None
-if VK_TOKEN:
+if VK_TOKEN and VK_GROUP_ID:
     try:
+        from vk_uploader import VKUploader
         vk_uploader = VKUploader(VK_TOKEN, VK_GROUP_ID)
-        print("✅ VK uploader инициализирован")
+        print(f"✅ VK uploader инициализирован (группа: {VK_GROUP_ID})")
     except Exception as e:
-        print(f"️ Ошибка инициализации VK: {e}")
+        print(f"⚠️ Ошибка инициализации VK: {e}")
+        vk_uploader = None
+elif VK_TOKEN:
+    print(f"⚠️ VK_TOKEN установлен, но VK_GROUP_ID НЕ установлен - VK отключён")
 else:
-    print("️ VK_TOKEN не установлен, публикация в VK отключена")
+    print(f"⚠️ VK_TOKEN НЕ установлен - VK отключён")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     print("❌ SUPABASE_URL или SUPABASE_KEY не установлены!")
@@ -138,7 +146,7 @@ def get_channel_updates():
     last_id = data[0]['last_message_id'] if data else 0
     
     # 2. Проверяем реальное последнее сообщение в базе ads
-    print("🔍 Проверяем последние сообщения в базе ads...")
+    print(" Проверяем последние сообщения в базе ads...")
     ads_url = f"{SUPABASE_URL}/rest/v1/ads?order=tg_message_id.desc&limit=1"
     ads_response = requests.get(ads_url, headers=HEADERS)
     
@@ -151,7 +159,7 @@ def get_channel_updates():
     
     # 3. Используем МАКСИМАЛЬНОЕ значение
     if real_last_id > last_id:
-        print(f"⚠️ last_message_id устарел! Используем {real_last_id} вместо {last_id}")
+        print(f"️ last_message_id устарел! Используем {real_last_id} вместо {last_id}")
         last_id = real_last_id
     
     print(f"✅ Будем искать сообщения > {last_id}")
@@ -184,7 +192,7 @@ def get_channel_updates():
                     results.append(update)
                     print(f"  ✅ Новое сообщение: {message_id}")
                 else:
-                    print(f"  ⏭️ Пропущено (старое): {message_id}")
+                    print(f"  ️ Пропущено (старое): {message_id}")
         
         if not results:
             print("ℹ️ Новых сообщений нет. Парсер завершает работу.")
@@ -193,7 +201,7 @@ def get_channel_updates():
         print(f"✅ Найдено {len(results)} новых сообщений для обработки")
         
         # 6. ГРУППИРУЕМ сообщения по media_group_id
-        print("\n Группируем сообщения по альбомам...")
+        print("\n📦 Группируем сообщения по альбомам...")
         groups = {}  # media_group_id -> список сообщений
         single_messages = []  # сообщения без media_group_id
         
@@ -269,17 +277,20 @@ def get_channel_updates():
             vk_post_url = None
             
             if vk_uploader and photo_urls:
-                print(f"  📤 Загружаем {min(len(photo_urls), 5)} фото в VK...")
-                for photo_url in photo_urls[:5]:  # Максимум 5 фото в посте VK
+                print(f"  📤 Загружаем {min(len(photo_urls), 10)} фото в VK...")
+                
+                for photo_url in photo_urls[:10]:  # Максимум 10 фото
                     vk_photo = vk_uploader.upload_photo_from_url(photo_url)
                     if vk_photo:
                         vk_photos.append(vk_photo)
+                        print(f"    ✅ Загружено: {vk_photo['url'][:50]}...")
+                    else:
+                        print(f"    ❌ Не загружено")
                 
-                # Создаём пост в VK
+                # Создаём пост в VK (если есть фото и текст)
                 if vk_photos and combined_text:
-                    # Обрезаем текст для VK (макс 4096 символов)
                     vk_message = combined_text[:4096] if len(combined_text) > 4096 else combined_text
-                    vk_message += f"\n\n📱 Источник: {main_post.get('chat', {}).get('username', 'канал')}"
+                    vk_message += f"\n\n📱 Источник: {post_link}"
                     
                     vk_post = vk_uploader.create_post(
                         message=vk_message,
@@ -292,9 +303,9 @@ def get_channel_updates():
                         vk_posts_count += 1
                         print(f"  ✅ Пост в VK: {vk_post_url}")
                         
-                        # Ждём 1 минуту между постами (чтобы не забанили)
-                        print("  ⏱️ Ожидание 60 секунд перед следующим постом...")
-                        time.sleep(60)
+                        # Ждём 65 секунд между постами
+                        print("  ⏱️ Ожидание 65 секунд перед следующим постом...")
+                        time.sleep(65)
             
             # Создаём объявление
             if combined_text or photo_urls:
@@ -319,12 +330,12 @@ def get_channel_updates():
                     'category': parse_category(combined_text) if combined_text else 'другое',
                     'city': parse_city(combined_text) if combined_text else 'Донецк',
                     'phone': extract_phone(combined_text) if combined_text else '',
-                    'photo_url': final_photo_url,  # URL из VK или Telegram
-                    'photo_urls': json.dumps(final_photo_urls),  # Все URL
-                    'vk_post_url': vk_post_url,  # Ссылка на пост в VK
+                    'photo_url': final_photo_url,
+                    'photo_urls': json.dumps(final_photo_urls),
+                    'vk_post_url': vk_post_url,
                     'post_link': post_link,
                     'forwarded_from': forwarded_from,
-                    'created_at': created_at_msk.isoformat()  # Время из Telegram (MSK)
+                    'created_at': created_at_msk.isoformat()
                 }
                 
                 new_ads.append(ad)
@@ -334,7 +345,7 @@ def get_channel_updates():
         
         # 8. Обрабатываем одиночные сообщения
         for post in single_messages:
-            print(f"\n Обрабатываем одиночное сообщение...")
+            print(f"\n🔄 Обрабатываем одиночное сообщение...")
             
             message_id = post['message_id']
             
@@ -400,16 +411,20 @@ def get_channel_updates():
             vk_post_url = None
             
             if vk_uploader and photo_urls:
-                print(f"  📤 Загружаем {min(len(photo_urls), 5)} фото в VK...")
-                for photo_url in photo_urls[:5]:  # Максимум 5 фото
+                print(f"   Загружаем {min(len(photo_urls), 10)} фото в VK...")
+                
+                for photo_url in photo_urls[:10]:
                     vk_photo = vk_uploader.upload_photo_from_url(photo_url)
                     if vk_photo:
                         vk_photos.append(vk_photo)
+                        print(f"    ✅ Загружено: {vk_photo['url'][:50]}...")
+                    else:
+                        print(f"    ❌ Не загружено")
                 
                 # Создаём пост в VK
                 if vk_photos and text:
                     vk_message = text[:4096] if len(text) > 4096 else text
-                    vk_message += f"\n\n📱 Источник: {channel_username}"
+                    vk_message += f"\n\n Источник: {channel_username}"
                     
                     vk_post = vk_uploader.create_post(
                         message=vk_message,
@@ -422,9 +437,9 @@ def get_channel_updates():
                         vk_posts_count += 1
                         print(f"  ✅ Пост в VK: {vk_post_url}")
                         
-                        # Ждём 1 минуту между постами
-                        print("  ⏱️ Ожидание 60 секунд перед следующим постом...")
-                        time.sleep(60)
+                        # Ждём 65 секунд между постами
+                        print("  ⏱️ Ожидание 65 секунд перед следующим постом...")
+                        time.sleep(65)
             
             # Создаем объявление
             if text or has_media:
@@ -447,7 +462,7 @@ def get_channel_updates():
                     'vk_post_url': vk_post_url,
                     'post_link': post_link,
                     'forwarded_from': forwarded_from,
-                    'created_at': created_at_msk.isoformat()  # Время из Telegram (MSK)
+                    'created_at': created_at_msk.isoformat()
                 }
                 
                 new_ads.append(ad)
@@ -486,7 +501,7 @@ def get_channel_updates():
             response = requests.patch(url, headers=HEADERS, json=update_data)
             
             if response.status_code == 200:
-                print(f"\n Готово! Добавлено {saved_count} объявлений")
+                print(f"\n✅ Готово! Добавлено {saved_count} объявлений")
                 print(f"   last_message_id обновлен: {last_id} → {max_id}")
             else:
                 print(f"⚠️ Ошибка обновления состояния: {response.status_code}")
