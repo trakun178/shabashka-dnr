@@ -13,9 +13,9 @@ class VKUploader:
         print(f"✅ VK uploader инициализирован (группа: {group_id})")
     
     def post_with_photos(self, message, photo_urls):
-        """Загружаем фото и публикуем пост"""
+        """Загружаем фото и публикуем пост в группу"""
         try:
-            print(f"   Загружаем {len(photo_urls)} фото в VK...")
+            print(f"  📤 Загружаем {len(photo_urls)} фото в VK...")
             
             photo_attachments = []
             
@@ -27,7 +27,7 @@ class VKUploader:
                 response = requests.get(photo_url, headers=headers, timeout=15)
                 
                 if response.status_code != 200:
-                    print(f"    ⚠️ Ошибка: {response.status_code}")
+                    print(f"    ️ Ошибка: {response.status_code}")
                     continue
                 
                 # Сохраняем временно
@@ -35,21 +35,47 @@ class VKUploader:
                 with open(temp_path, 'wb') as f:
                     f.write(response.content)
                 
-                # Загружаем фото БЕЗ group_id (на стену пользователя)
+                # Загружаем фото в группу
                 try:
-                    upload = self.upload.photo_wall(photos=[temp_path])
-                    
-                    photo_id = upload[0]['id']
-                    owner_id = upload[0]['owner_id']
-                    photo_attachments.append(f"photo{owner_id}_{photo_id}")
-                    
-                    print(f"    ✅ Загружено: photo{owner_id}_{photo_id}")
+                    if self.group_id:
+                        # Получаем URL для загрузки в группу
+                        upload_url_response = self.vk_api.photos.getOwnerPhotoUploadServer(
+                            group_id=self.group_id
+                        )
+                        
+                        upload_url = upload_url_response['upload_url']
+                        
+                        # Загружаем фото на сервер VK
+                        with open(temp_path, 'rb') as f:
+                            upload_response = requests.post(
+                                upload_url,
+                                files={'photo': f}
+                            ).json()
+                        
+                        # Сохраняем фото
+                        saved_photo = self.vk_api.photos.saveOwnerPhoto(
+                            photo=upload_response['photo'],
+                            hash=upload_response['hash'],
+                            server=upload_response['server']
+                        )
+                        
+                        photo_id = saved_photo[0]['id']
+                        owner_id = -int(self.group_id)  # Отрицательный для группы
+                        photo_attachments.append(f"photo{owner_id}_{photo_id}")
+                        
+                        print(f"    ✅ Загружено: photo{owner_id}_{photo_id}")
+                    else:
+                        # Загружаем на личную стену
+                        upload = self.upload.photo_wall(photos=[temp_path])
+                        photo_id = upload[0]['id']
+                        owner_id = upload[0]['owner_id']
+                        photo_attachments.append(f"photo{owner_id}_{photo_id}")
+                        print(f"    ✅ Загружено: photo{owner_id}_{photo_id}")
                     
                 except Exception as e:
                     print(f"    ❌ Ошибка загрузки: {str(e)[:100]}")
                 
                 finally:
-                    # Удаляем временный файл
                     try:
                         os.remove(temp_path)
                     except:
@@ -60,15 +86,15 @@ class VKUploader:
                 return None
             
             # Публикуем пост
-            print(f"  📝 Публикуем пост...")
+            print(f"   Публикуем пост...")
             
             attachments_str = ",".join(photo_attachments)
             
-            # Публикуем В ГРУППУ (отрицательный ID)
+            # Публикуем В ГРУППУ
             if self.group_id:
                 post = self.vk_api.wall.post(
                     owner_id=-int(self.group_id),
-                    message=message[:4096],  # Максимум 4096 символов
+                    message=message[:4096],
                     attachments=attachments_str
                 )
             else:
@@ -83,7 +109,7 @@ class VKUploader:
             return {
                 'post_id': post['post_id'],
                 'post_url': post_url,
-                'photo_url': None,  # URL получим позже
+                'photo_url': None,
                 'attachments': photo_attachments
             }
             
