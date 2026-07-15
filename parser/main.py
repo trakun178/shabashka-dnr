@@ -81,13 +81,14 @@ def get_file_url(file_id):
     return None
 
 def extract_phone(text):
-    """Извлекаем телефон из текста"""
+    """Извлекаем телефон из текста - только цифры"""
     import re
     if not text:
         return ''
-    phones = re.findall(r'[\+]?[0-9\s\-\(\)]{10,20}', text)
+    # Ищем только цифры и + в начале, 10-15 цифр
+    phones = re.findall(r'\+?\d{10,15}', text)
     if phones:
-        return phones[0].strip()
+        return phones[0]
     return ''
 
 def parse_category(text):
