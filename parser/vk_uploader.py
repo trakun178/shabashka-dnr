@@ -55,7 +55,7 @@ class VKUploader:
         full_message = message
         if footer_parts:
             # Жёлтая разделительная линия (вариант 2)
-            separator = "🔸" * 40
+            separator = "🔸" * 10
             full_message += "\n\n" + separator + "\n" + "\n".join(footer_parts)
         
         # Загружаем фото если есть
