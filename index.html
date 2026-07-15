@@ -339,6 +339,7 @@
         color: #333;
         margin-bottom: 0.5rem;
         line-height: 1.6;
+        white-space: pre-wrap; /* ✅ СОХРАНЯЕМ ПЕРЕНОСЫ СТРОК */
         word-wrap: break-word;
         font-size: 1rem;
       }
@@ -671,6 +672,9 @@
         transition:
           transform 0.2s,
           color 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
 
       .social-links a:hover {
@@ -678,10 +682,11 @@
         color: #ffb800;
       }
 
-      /* Иконка MAX - белая для тёмного фона */
+      /* Иконка MAX - используем картинку */
       .social-links .max-icon {
-        fill: #ffb800;
-        color: #ffb800;
+        width: 32px;
+        height: 32px;
+        object-fit: contain;
       }
 
       .footer-text {
@@ -920,19 +925,8 @@
             rel="noopener noreferrer"
             title="MAX"
           >
-            <!-- Белая иконка MAX для тёмного фона -->
-            <svg
-              class="max-icon"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 720 720"
-              width="32"
-              height="32"
-            >
-              <path
-                d="M360 0C161.2 0 0 161.2 0 360s161.2 360 360 360 360-161.2 360-360S558.8 0 360 0zm0 648c-159.1 0-288-128.9-288-288S200.9 72 360 72s288 128.9 288 288-128.9 288-288 288zm-36-432h72v252h-72V216zm36 324c-21.6 0-39.6-18-39.6-39.6s18-39.6 39.6-39.6 39.6 18 39.6 39.6-18 39.6-39.6 39.6z"
-                fill="#ffb800"
-              />
-            </svg>
+            <!-- Иконка MAX из файла -->
+            <img src="images/max_logo-32x32.png" alt="MAX" class="max-icon" />
           </a>
         </div>
         <p class="footer-text">
@@ -1149,9 +1143,9 @@
                                 : ""
                             }
                             <div class="ad-meta">
-                                <span>📍 ${ad.city || "Донецк"}</span>
+                                <span> ${ad.city || "Донецк"}</span>
                                 ${ad.phone ? `<span>📞 ${ad.phone}</span>` : ""}
-                                ${ad.forwarded_from ? `<span>️ ${ad.forwarded_from}</span>` : ""}
+                                ${ad.forwarded_from ? `<span>↪️ ${ad.forwarded_from}</span>` : ""}
                                 <span>🕐 ${new Date(ad.created_at).toLocaleString("ru-RU")}</span>
                             </div>
                             <div class="ad-buttons">
