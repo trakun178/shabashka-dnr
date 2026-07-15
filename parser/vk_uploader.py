@@ -33,7 +33,7 @@ class VKUploader:
         return data.get("response")
     
     def post_with_photos(self, message, photo_urls=None, forwarded_from=None, post_link=None):
-        """Загружаем фото (если есть) и публикуем пост в группу VK"""
+        """Публикуем пост в VK (с фото или без)"""
         if not self.group_id:
             print("❌ Не указан group_id")
             return None
@@ -43,26 +43,21 @@ class VKUploader:
         
         # Формируем подпись
         footer_parts = []
-        
-        # 1. Источник (всегда добавляем)
         footer_parts.append(f"📢 Источник: {self.source_name}")
         
-        # 2. Переслано от (только если не от канала)
         if forwarded_from and not forwarded_from.startswith('@'):
             footer_parts.append(f"👤 Переслано от: {forwarded_from}")
         
-        # 3. Ссылка на оригинал
         if post_link:
             footer_parts.append(f"🔗 Оригинал поста: {post_link}")
         
-        # Добавляем подпись к сообщению
         full_message = message
         if footer_parts:
             full_message += "\n\n" + "\n".join(footer_parts)
         
         # Загружаем фото если есть
         if photo_urls:
-            print(f"📤 Загружаем {len(photo_urls)} фото...")
+            print(f" Загружаем {len(photo_urls)} фото...")
             
             for index, photo_url in enumerate(photo_urls[:10], start=1):
                 temp_file = f"temp_{int(time.time())}_{index}.jpg"
@@ -77,13 +72,12 @@ class VKUploader:
                     )
                     
                     if img.status_code != 200:
-                        print("❌ Не удалось скачать изображение")
+                        print("❌ Не удалось скачать")
                         continue
                     
                     with open(temp_file, "wb") as f:
                         f.write(img.content)
                     
-                    # Получаем сервер загрузки
                     upload_server = self._api_call(
                         "photos.getWallUploadServer",
                         {"group_id": self.group_id}
@@ -93,7 +87,7 @@ class VKUploader:
                         continue
                     
                     upload_url = upload_server["upload_url"]
-                    print("⬆ Загружаем в VK...")
+                    print("⬆ Загружаем...")
                     
                     with open(temp_file, "rb") as f:
                         upload_response = requests.post(
@@ -103,15 +97,11 @@ class VKUploader:
                         ).json()
                     
                     if "error" in upload_response:
-                        print("❌ Ошибка загрузки файла")
                         continue
                     
                     required = ("server", "photo", "hash")
                     if not all(x in upload_response for x in required):
-                        print("❌ Некорректный ответ VK")
                         continue
-                    
-                    print("💾 Сохраняем фото...")
                     
                     saved = self._api_call(
                         "photos.saveWallPhoto",
@@ -123,15 +113,12 @@ class VKUploader:
                         },
                     )
                     
-                    if not saved:
-                        continue
-                    
-                    photo = saved[0]
-                    attachment = f"photo{photo['owner_id']}_{photo['id']}"
-                    attachments.append(attachment)
-                    
-                    print(f"✅ Фото сохранено: {attachment}")
-                    
+                    if saved:
+                        photo = saved[0]
+                        attachment = f"photo{photo['owner_id']}_{photo['id']}"
+                        attachments.append(attachment)
+                        print(f"✅ Фото загружено")
+                
                 except Exception as e:
                     print(f"❌ {e}")
                 
@@ -140,7 +127,7 @@ class VKUploader:
                         os.remove(temp_file)
         
         # Публикуем пост (с фото или без)
-        print("\n Создаем запись на стене...")
+        print(f"📝 Публикуем пост...")
         print(f"   Текст: {full_message[:100]}...")
         print(f"   Вложений: {len(attachments)}")
         
@@ -162,7 +149,6 @@ class VKUploader:
         post_url = f"https://vk.com/wall{owner_id}_{post['post_id']}"
         print(f"✅ Пост опубликован: {post_url}")
         
-        # Возвращаем результат
         return {
             "post_id": post["post_id"],
             "post_url": post_url,

@@ -51,7 +51,7 @@ if VK_TOKEN and VK_GROUP_ID:
         traceback.print_exc()
         vk_uploader = None
 elif VK_TOKEN:
-    print(f"⚠️ VK_TOKEN есть, но VK_GROUP_ID НЕ установлен - VK отключён")
+    print(f"️ VK_TOKEN есть, но VK_GROUP_ID НЕ установлен - VK отключён")
 else:
     print(f"⚠️ VK_TOKEN НЕ установлен - VK отключён")
 
@@ -149,11 +149,11 @@ def smart_title(text, max_length=70):
 def get_channel_updates():
     """Основная функция парсера"""
     print("\n" + "=" * 50)
-    print("🚀 Запуск парсера Telegram канала")
+    print(" Запуск парсера Telegram канала")
     print("=" * 50)
     
     # 1. Получаем last_message_id из Supabase
-    print(" Получаем последнее состояние парсера...")
+    print("📥 Получаем последнее состояние парсера...")
     url = f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1"
     response = requests.get(url, headers=HEADERS)
     
@@ -217,7 +217,7 @@ def get_channel_updates():
                     print(f"  ❌ Telegram API error: {data}")
                     return
             else:
-                print(f"  ️ Ошибка {response.status_code}: {response.text[:100]}")
+                print(f"  ⚠️ Ошибка {response.status_code}: {response.text[:100]}")
                 if attempt < max_retries - 1:
                     print(f"   Ждём 10 секунд перед повторной попыткой...")
                     time.sleep(10)
@@ -241,7 +241,7 @@ def get_channel_updates():
             continue
             
         except Exception as e:
-            print(f"   Неожиданная ошибка: {e}")
+            print(f"  Неожиданная ошибка: {e}")
             if attempt < max_retries - 1:
                 time.sleep(10)
             continue
@@ -271,7 +271,7 @@ def get_channel_updates():
     print(f"\n✅ Найдено {len(results)} новых сообщений для обработки")
     
     # 6. ГРУППИРУЕМ сообщения по media_group_id
-    print("\n📦 Группируем сообщения по альбомам...")
+    print("\n Группируем сообщения по альбомам...")
     groups = {}  # media_group_id -> список сообщений
     single_messages = []  # сообщения без media_group_id
     
@@ -299,7 +299,7 @@ def get_channel_updates():
     vk_posts_count = 0
     
     for media_group_id, posts in groups.items():
-        print(f"\n️ Обрабатываем альбом {media_group_id} ({len(posts)} фото)...")
+        print(f"\n🔄 Обрабатываем альбом {media_group_id} ({len(posts)} фото)...")
         
         # Берём первое сообщение как основное
         main_post = posts[0]
@@ -342,21 +342,28 @@ def get_channel_updates():
         
         print(f"  📸 Найдено фото: {len(photo_urls)}")
         
-        # Загружаем фото в VK и сразу публикуем пост (если есть uploader)
+        # Публикуем в VK (если есть uploader и есть текст или фото)
         vk_result = None
         
-        if vk_uploader and photo_urls:
-            print(f"  📤 Загружаем {len(photo_urls)} фото в VK и публикуем пост...")
+        if vk_uploader and (combined_text or photo_urls):
+            print(f"  📤 Публикуем пост в VK...")
+            
+            # Ссылка на пост в Telegram
+            post_link = f"https://t.me/{main_post.get('chat', {}).get('username', 'dnrsabbath')}/{message_id}"
+            
+            # Переслано от
+            forwarded_from = main_post.get('forward_sender_name') or \
+                            (main_post.get('forward_from_chat', {}).get('title') if 'forward_from_chat' in main_post else None)
             
             # Формируем текст для VK
-            post_link = f"https://t.me/{main_post.get('chat', {}).get('username', 'dnrsabbath')}/{message_id}"
             vk_message = combined_text[:4096] if len(combined_text) > 4096 else combined_text
-            vk_message += f"\n\n📱 Источник: {post_link}"
             
-            # Сразу публикуем пост с фото
+            # Публикуем пост
             vk_result = vk_uploader.post_with_photos(
                 message=vk_message,
-                photo_urls=photo_urls
+                photo_urls=photo_urls if photo_urls else None,
+                forwarded_from=forwarded_from,
+                post_link=post_link
             )
             
             if vk_result:
@@ -406,7 +413,7 @@ def get_channel_updates():
     
     # 8. Обрабатываем одиночные сообщения
     for post in single_messages:
-        print(f"\n🔄 Обрабатываем одиночное сообщение...")
+        print(f"\n Обрабатываем одиночное сообщение...")
         
         message_id = post['message_id']
         
@@ -467,22 +474,21 @@ def get_channel_updates():
             if photo_url:
                 photo_urls.append(photo_url)
         
-        # Загружаем фото в VK и сразу публикуем пост (если есть uploader)
+        # Публикуем в VK (если есть uploader и есть текст или фото)
         vk_result = None
         
-        if vk_uploader and photo_urls:
-            print(f"  📤 Загружаем {len(photo_urls)} фото в VK и публикуем пост...")
+        if vk_uploader and (text or photo_urls):
+            print(f"   Публикуем пост в VK...")
             
             # Формируем текст для VK
             vk_message = text[:4096] if len(text) > 4096 else text
-            vk_message += f"\n\n📱 Источник: {channel_username}"
             
-            # Сразу публикуем пост с фото
+            # Публикуем пост
             vk_result = vk_uploader.post_with_photos(
-             message=vk_message,
-             photo_urls=photo_urls,
-             forwarded_from=forwarded_from,
-             post_link=post_link
+                message=vk_message,
+                photo_urls=photo_urls if photo_urls else None,
+                forwarded_from=forwarded_from,
+                post_link=post_link
             )
             
             if vk_result:
@@ -490,7 +496,7 @@ def get_channel_updates():
                 print(f"  ✅ Пост в VK: {vk_result['post_url']}")
                 
                 # Ждём 65 секунд между постами
-                print("  ️ Ожидание 65 секунд перед следующим постом...")
+                print("  ⏱️ Ожидание 65 секунд перед следующим постом...")
                 time.sleep(65)
         
         # Создаем объявление
@@ -541,7 +547,7 @@ def get_channel_updates():
         if response.status_code in [200, 201]:
             print("✅ Объявления сохранены!")
         else:
-            print(f"️ Ошибка сохранения: {response.status_code}")
+            print(f"⚠️ Ошибка сохранения: {response.status_code}")
             print(f"Response: {response.text[:200]}")
         
         # 10. Обновляем last_message_id
