@@ -61,7 +61,6 @@
         transition:
           transform 0.3s ease,
           box-shadow 0.3s ease;
-        cursor: pointer;
       }
 
       .ad-card:hover {
@@ -173,6 +172,7 @@
         font-weight: 500;
         font-size: 0.9em;
         margin-top: 10px;
+        margin-right: 10px;
         transition: all 0.3s ease;
       }
 
@@ -207,7 +207,7 @@
       .footer-link {
         color: #667eea;
         text-decoration: none;
-        display: flex;
+        display: inline-flex;
         align-items: center;
         gap: 8px;
         padding: 10px 20px;
@@ -425,6 +425,12 @@
         container.innerHTML = ads
           .map((ad) => {
             const hasLongText = ad.description && ad.description.length > 200;
+            const photoUrls = ad.photo_urls
+              ? JSON.parse(ad.photo_urls)
+              : ad.photo_url
+                ? [ad.photo_url]
+                : [];
+
             return `
                     <div class="ad-card" data-id="${ad.tg_message_id}">
                         ${
@@ -433,7 +439,7 @@
                             <img src="${ad.photo_url}" 
                                  alt="${ad.title}" 
                                  class="ad-photo"
-                                 onclick="openModal('${ad.photo_url}', ${JSON.stringify(ad.photo_urls ? JSON.parse(ad.photo_urls) : [ad.photo_url]).replace(/"/g, "&quot;")})">
+                                 onclick="openModal('${ad.photo_url}', ${JSON.stringify(photoUrls).replace(/"/g, "&quot;")})">
                         `
                             : ""
                         }
@@ -450,7 +456,7 @@
                         `
                             : ""
                         }
-                        ${ad.phone ? `<a href="tel:${ad.phone}" class="ad-phone">📞 ${ad.phone}</a>` : ""}
+                        ${ad.phone ? `<a href="tel:${ad.phone}" class="ad-phone"> ${ad.phone}</a>` : ""}
                         ${
                           ad.vk_post_url
                             ? `
