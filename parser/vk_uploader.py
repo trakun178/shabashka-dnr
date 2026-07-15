@@ -33,7 +33,7 @@ class VKUploader:
         return data.get("response")
     
     def post_with_photos(self, message, photo_urls=None, forwarded_from=None, post_link=None):
-        """Публикуем пост в VK (с фото или без)"""
+        """Загружаем фото (если есть) и публикуем пост в группу VK"""
         if not self.group_id:
             print("❌ Не указан group_id")
             return None
@@ -43,7 +43,7 @@ class VKUploader:
         
         # Формируем подпись
         footer_parts = []
-        footer_parts.append(f"📢 Источник: {self.source_name}")
+        footer_parts.append(f" Источник: {self.source_name}")
         
         if forwarded_from and not forwarded_from.startswith('@'):
             footer_parts.append(f"👤 Переслано от: {forwarded_from}")
@@ -51,13 +51,16 @@ class VKUploader:
         if post_link:
             footer_parts.append(f"🔗 Оригинал поста: {post_link}")
         
+        # Добавляем подпись к сообщению с жёлтой разделительной линией
         full_message = message
         if footer_parts:
-            full_message += "\n\n" + "\n".join(footer_parts)
+            # Жёлтая разделительная линия (вариант 2)
+            separator = "🔸" * 40
+            full_message += "\n\n" + separator + "\n" + "\n".join(footer_parts)
         
         # Загружаем фото если есть
         if photo_urls:
-            print(f" Загружаем {len(photo_urls)} фото...")
+            print(f"📤 Загружаем {len(photo_urls)} фото...")
             
             for index, photo_url in enumerate(photo_urls[:10], start=1):
                 temp_file = f"temp_{int(time.time())}_{index}.jpg"
@@ -87,7 +90,7 @@ class VKUploader:
                         continue
                     
                     upload_url = upload_server["upload_url"]
-                    print("⬆ Загружаем...")
+                    print(" Загружаем...")
                     
                     with open(temp_file, "rb") as f:
                         upload_response = requests.post(
