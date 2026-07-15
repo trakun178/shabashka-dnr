@@ -479,8 +479,10 @@ def get_channel_updates():
             
             # Сразу публикуем пост с фото
             vk_result = vk_uploader.post_with_photos(
-                message=vk_message,
-                photo_urls=photo_urls
+             message=vk_message,
+             photo_urls=photo_urls,
+             forwarded_from=forwarded_from,
+             post_link=post_link
             )
             
             if vk_result:
