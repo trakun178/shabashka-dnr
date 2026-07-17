@@ -381,9 +381,15 @@ def get_channel_updates():
             description = combined_text if combined_text else "Объявление с медиа файлом"
             
             # Используем данные из VK
-            final_photo_url = vk_result['photo_url'] if vk_result else None
             vk_post_url = vk_result['post_url'] if vk_result else None
-            final_photo_urls = [final_photo_url] if final_photo_url else photo_urls
+            
+            # ✅ ИСПРАВЛЕНИЕ: Берем ВЕСЬ массив фото из VK, если загрузка прошла успешно
+            if vk_result and vk_result.get('photo_urls'):
+                final_photo_urls = vk_result['photo_urls']
+            else:
+                final_photo_urls = photo_urls if photo_urls else []
+                
+            final_photo_url = final_photo_urls[0] if final_photo_urls else None
             
             # Ссылка на пост в Telegram
             post_link = f"https://t.me/{main_post.get('chat', {}).get('username', 'dnrsabbath')}/{message_id}"
@@ -506,9 +512,15 @@ def get_channel_updates():
             description = text if text else "Объявление с медиа файлом"
             
             # Используем данные из VK
-            final_photo_url = vk_result['photo_url'] if vk_result else None
             vk_post_url = vk_result['post_url'] if vk_result else None
-            final_photo_urls = [final_photo_url] if final_photo_url else photo_urls
+            
+            # ✅ ИСПРАВЛЕНИЕ: Берем ВЕСЬ массив фото из VK, если загрузка прошла успешно
+            if vk_result and vk_result.get('photo_urls'):
+                final_photo_urls = vk_result['photo_urls']
+            else:
+                final_photo_urls = photo_urls if photo_urls else []
+                
+            final_photo_url = final_photo_urls[0] if final_photo_urls else None
             
             ad = {
                 'tg_message_id': message_id,

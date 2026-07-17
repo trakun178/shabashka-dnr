@@ -40,10 +40,11 @@ class VKUploader:
         
         owner_id = -abs(int(self.group_id))
         attachments = []
+        vk_photo_urls = []  # ✅ Сохраняем URL ВСЕХ фото из VK
         
         # Формируем подпись
         footer_parts = []
-        footer_parts.append(f" Источник: {self.source_name}")
+        footer_parts.append(f"📢 Источник: {self.source_name}")
         
         if forwarded_from and not forwarded_from.startswith('@'):
             footer_parts.append(f"👤 Переслано от: {forwarded_from}")
@@ -54,7 +55,6 @@ class VKUploader:
         # Добавляем подпись к сообщению с жёлтой разделительной линией
         full_message = message
         if footer_parts:
-            # Жёлтая разделительная линия (вариант 2)
             separator = "🔸" * 10
             full_message += "\n\n" + separator + "\n" + "\n".join(footer_parts)
         
@@ -90,7 +90,7 @@ class VKUploader:
                         continue
                     
                     upload_url = upload_server["upload_url"]
-                    print(" Загружаем...")
+                    print("⬆ Загружаем...")
                     
                     with open(temp_file, "rb") as f:
                         upload_response = requests.post(
@@ -106,6 +106,7 @@ class VKUploader:
                     if not all(x in upload_response for x in required):
                         continue
                     
+                    print(" Сохраняем фото...")
                     saved = self._api_call(
                         "photos.saveWallPhoto",
                         {
@@ -120,7 +121,14 @@ class VKUploader:
                         photo = saved[0]
                         attachment = f"photo{photo['owner_id']}_{photo['id']}"
                         attachments.append(attachment)
-                        print(f"✅ Фото загружено")
+                        
+                        # ✅ Получаем URL загруженного фото
+                        if "sizes" in photo and photo["sizes"]:
+                            largest_size = max(photo["sizes"], key=lambda x: x.get("width", 0))
+                            vk_photo_urls.append(largest_size["url"])
+                            print(f"✅ Фото загружено: {largest_size['url'][:80]}...")
+                        else:
+                            print(f"✅ Фото загружено")
                 
                 except Exception as e:
                     print(f"❌ {e}")
@@ -130,7 +138,7 @@ class VKUploader:
                         os.remove(temp_file)
         
         # Публикуем пост (с фото или без)
-        print(f"📝 Публикуем пост...")
+        print(f"\n📝 Создаем запись на стене...")
         print(f"   Текст: {full_message[:100]}...")
         print(f"   Вложений: {len(attachments)}")
         
@@ -152,9 +160,11 @@ class VKUploader:
         post_url = f"https://vk.com/wall{owner_id}_{post['post_id']}"
         print(f"✅ Пост опубликован: {post_url}")
         
+        # ✅ Возвращаем URL ВСЕХ фото из VK
         return {
             "post_id": post["post_id"],
             "post_url": post_url,
-            "photo_url": None,
+            "photo_urls": vk_photo_urls,  # ✅ ТЕПЕРЬ ВОЗВРАЩАЕМ МАССИВ ВСЕХ URL
+            "photo_url": vk_photo_urls[0] if vk_photo_urls else None,  # Для совместимости
             "attachments": attachments,
         }
