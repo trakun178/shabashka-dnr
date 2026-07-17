@@ -558,25 +558,25 @@ def get_channel_updates():
         response = requests.post(url, headers=headers_upsert, json=new_ads)
         
         if response.status_code in [200, 201]:
-            print("✅ Объявления сохранены!")
+            print("✅ Объявления успешно сохранены в базу!")
+            
+            # ✅ 10. Обновляем last_message_id ТОЛЬКО ПРИ УСПЕШНОМ СОХРАНЕНИИ
+            print("🔄 Обновляем состояние парсера...")
+            url_state = f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1"
+            update_data = {
+                'last_message_id': max_id,
+                'updated_at': datetime.now(msk_tz).isoformat()
+            }
+            state_response = requests.patch(url_state, headers=HEADERS, json=update_data)
+            
+            if state_response.status_code == 200:
+                print(f"✅ Готово! last_message_id обновлен: {last_id} → {max_id}")
+            else:
+                print(f"⚠️ Ошибка обновления состояния: {state_response.status_code}")
         else:
-            print(f"⚠️ Ошибка сохранения: {response.status_code}")
-            print(f"Response: {response.text[:200]}")
-        
-        # 10. Обновляем last_message_id
-        print("🔄 Обновляем состояние парсера...")
-        url = f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1"
-        update_data = {
-            'last_message_id': max_id,
-            'updated_at': datetime.now(msk_tz).isoformat()
-        }
-        response = requests.patch(url, headers=HEADERS, json=update_data)
-        
-        if response.status_code == 200:
-            print(f"\n✅ Готово! Добавлено {saved_count} объявлений")
-            print(f"   last_message_id обновлен: {last_id} → {max_id}")
-        else:
-            print(f"⚠️ Ошибка обновления состояния: {response.status_code}")
+            print(f"❌ КРИТИЧЕСКАЯ ОШИБКА: Объявления НЕ сохранены (Код: {response.status_code})")
+            print(f"Ответ Supabase: {response.text[:300]}")
+            print("⚠️ last_message_id НЕ обновлен! При следующем запуске парсер попробует сохранить их снова.")
     else:
         print("\nℹ️ Новых объявлений для сохранения нет")
 
