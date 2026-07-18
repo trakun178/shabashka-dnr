@@ -40,10 +40,11 @@ class VKUploader:
         
         owner_id = -abs(int(self.group_id))
         attachments = []
+        vk_photo_urls = []  # Сохраняем URL всех фото из VK
         
         # Формируем подпись
         footer_parts = []
-        footer_parts.append(f"📢 Источник: {self.source_name}")
+        footer_parts.append(f" Источник: {self.source_name}")
         
         if forwarded_from and not forwarded_from.startswith('@'):
             footer_parts.append(f"👤 Переслано от: {forwarded_from}")
@@ -91,7 +92,6 @@ class VKUploader:
                     upload_url = upload_server["upload_url"]
                     print("⬆ Загружаем в VK...")
                     
-                    # Загружаем файл
                     with open(temp_file, "rb") as f:
                         upload_response = requests.post(
                             upload_url,
@@ -99,30 +99,16 @@ class VKUploader:
                             timeout=60
                         ).json()
                     
-                    print("📥 UPLOAD RESPONSE:")
-                    print(upload_response)
-                    
                     if "error" in upload_response:
-                        print(f"❌ Ошибка загрузки файла: {upload_response['error']}")
+                        print(f"❌ Ошибка загрузки: {upload_response.get('error', 'Unknown')}")
                         continue
                     
-                    # Проверяем наличие требуемых полей
-                    if "photo" not in upload_response:
-                        print(f"❌ Нет поля 'photo' в ответе VK")
-                        print(f"   Доступные поля: {list(upload_response.keys())}")
-                        continue
-                    
-                    if "server" not in upload_response:
-                        print(f"❌ Нет поля 'server' в ответе VK")
-                        continue
-                    
-                    if "hash" not in upload_response:
-                        print(f"❌ Нет поля 'hash' в ответе VK")
+                    required = ("server", "photo", "hash")
+                    if not all(x in upload_response for x in required):
+                        print("❌ Некорректный ответ VK")
                         continue
                     
                     print("💾 Сохраняем фото...")
-                    
-                    # Сохраняем фото
                     saved = self._api_call(
                         "photos.saveWallPhoto",
                         {
@@ -133,24 +119,20 @@ class VKUploader:
                         },
                     )
                     
-                    print(" SAVE RESPONSE:")
-                    print(saved)
-                    
-                    if not saved:
-                        print("❌ photos.saveWallPhoto вернул None")
-                        continue
-                    
-                    if not isinstance(saved, list) or len(saved) == 0:
-                        print(f"❌ Ожидался список фото, получено: {saved}")
-                        continue
-                    
-                    photo = saved[0]
-                    attachment = f"photo{photo['owner_id']}_{photo['id']}"
-                    attachments.append(attachment)
-                    print(f"✅ Фото сохранено: {attachment}")
+                    if saved and len(saved) > 0:
+                        photo = saved[0]
+                        attachment = f"photo{photo['owner_id']}_{photo['id']}"
+                        attachments.append(attachment)
+                        
+                        # Сохраняем URL фото
+                        if "sizes" in photo and photo["sizes"]:
+                            largest = max(photo["sizes"], key=lambda x: x.get("width", 0))
+                            vk_photo_urls.append(largest["url"])
+                        
+                        print(f"✅ Фото сохранено: {attachment}")
                 
                 except Exception as e:
-                    print(f"❌ Ошибка: {e}")
+                    print(f" Ошибка: {e}")
                     import traceback
                     traceback.print_exc()
                 
@@ -163,9 +145,10 @@ class VKUploader:
         print(f"   Текст: {full_message[:100]}...")
         print(f"   Вложений: {len(attachments)}")
         
+        # ✅ ВАЖНО: from_group=1 публикует ОТ ГРУППЫ (не от админа)
         post_params = {
             "owner_id": owner_id,
-            "from_group": 1,
+            "from_group": 1,  # ✅ Публикуем ОТ ГРУППЫ
             "message": full_message[:4096],
         }
         
@@ -185,6 +168,7 @@ class VKUploader:
         return {
             "post_id": post["post_id"],
             "post_url": post_url,
-            "photo_url": None,
+            "photo_urls": vk_photo_urls,  # Возвращаем ВСЕ URL фото
+            "photo_url": vk_photo_urls[0] if vk_photo_urls else None,  # Для совместимости
             "attachments": attachments,
         }
