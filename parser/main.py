@@ -370,8 +370,10 @@ def get_channel_updates():
             if vk_result:
                 vk_posts_count += 1
                 print(f"  ✅ Пост в VK: {vk_result['post_url']}")
-                
-                # Ждём 65 секунд между постами
+
+            # Делаем задержку ТОЛЬКО если это не последнее сообщение
+            current_group_index = list(groups.keys()).index(media_group_id)
+            if current_group_index < len(groups) - 1 or single_messages:
                 print("  ⏱️ Ожидание 65 секунд перед следующим постом...")
                 time.sleep(65)
         
@@ -501,8 +503,10 @@ def get_channel_updates():
             if vk_result:
                 vk_posts_count += 1
                 print(f"  ✅ Пост в VK: {vk_result['post_url']}")
-                
-                # Ждём 65 секунд между постами
+
+            # Делаем задержку ТОЛЬКО если это не последнее сообщение
+            current_msg_index = single_messages.index(post)
+            if current_msg_index < len(single_messages) - 1:
                 print("  ⏱️ Ожидание 65 секунд перед следующим постом...")
                 time.sleep(65)
         
