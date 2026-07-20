@@ -195,14 +195,38 @@ def get_channel_updates():
                 photo_url = get_file_url(post['document']['file_id'])
                 if photo_url: photo_urls.append(photo_url)
         
+        # ✅ ПРОВЕРКИ ПЕРЕД ЗАГРУЗКОЙ
+        print(f"  📸 Найдено фото: {len(photo_urls)}")
+        if photo_urls:
+            print(f"  🔍 Пример URL: {photo_urls[0][:100]}...")
+            for i, url in enumerate(photo_urls[:3]):
+                if not url or not str(url).startswith('http'):
+                    print(f"  ⚠️ Неверный URL фото #{i+1}: {url}")
+        
         vk_result = None
-        # ✅ Публикуем, если есть текст ИЛИ фото (исправлено для текстовых постов)
+        # ✅ Публикуем, если есть текст ИЛИ фото
         if vk_uploader and (combined_text or photo_urls):
+            print(f"  📤 Публикуем пост в VK...")
+            print(f"     Текст: {len(combined_text)} символов")
+            print(f"     Фото: {len(photo_urls)} шт.")
+            
+            # Проверка на пустые значения в списке
+            if photo_urls and not any(photo_urls):
+                print("  ⚠️ ВНИМАНИЕ: Список фото пуст или содержит None значения")
+                photo_urls = []
+            
             post_link = f"https://t.me/{main_post.get('chat', {}).get('username', 'dnrsabbath')}/{message_id}"
             forwarded_from = main_post.get('forward_sender_name') or (main_post.get('forward_from_chat', {}).get('title') if 'forward_from_chat' in main_post else None)
             
+            vk_message = combined_text[:4096] if len(combined_text) > 4096 else combined_text
+            
+            print(f"  📦 Отправляем в VK:")
+            print(f"     Сообщение: {vk_message[:100]}...")
+            if photo_urls:
+                print(f"     Фото URL: {photo_urls[0][:80]}...")
+            
             vk_result = vk_uploader.post_with_photos(
-                message=combined_text[:4096],
+                message=vk_message,
                 photo_urls=photo_urls if photo_urls else None,
                 forwarded_from=forwarded_from,
                 post_link=post_link
@@ -285,10 +309,33 @@ def get_channel_updates():
             photo_url = get_file_url(post['document']['file_id'])
             if photo_url: photo_urls.append(photo_url)
         
+        # ✅ ПРОВЕРКИ ПЕРЕД ЗАГРУЗКОЙ
+        print(f"   📸 Найдено фото: {len(photo_urls)}")
+        if photo_urls:
+            print(f"   🔍 Пример URL: {photo_urls[0][:100]}...")
+            for i, url in enumerate(photo_urls[:3]):
+                if not url or not str(url).startswith('http'):
+                    print(f"   ⚠️ Неверный URL фото #{i+1}: {url}")
+        
         vk_result = None
         if vk_uploader and (text or photo_urls):
+            print(f"   📤 Публикуем пост в VK...")
+            print(f"      Текст: {len(text)} символов")
+            print(f"      Фото: {len(photo_urls)} шт.")
+            
+            if photo_urls and not any(photo_urls):
+                print("   ⚠️ ВНИМАНИЕ: Список фото пуст или содержит None значения")
+                photo_urls = []
+            
+            vk_message = text[:4096] if len(text) > 4096 else text
+            
+            print(f"   📦 Отправляем в VK:")
+            print(f"      Сообщение: {vk_message[:100]}...")
+            if photo_urls:
+                print(f"      Фото URL: {photo_urls[0][:80]}...")
+            
             vk_result = vk_uploader.post_with_photos(
-                message=text[:4096],
+                message=vk_message,
                 photo_urls=photo_urls if photo_urls else None,
                 forwarded_from=forwarded_from,
                 post_link=post_link
