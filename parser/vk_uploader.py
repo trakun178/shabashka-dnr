@@ -15,10 +15,8 @@ class VKUploader:
             params = {}
         params["access_token"] = self.token
         params["v"] = "5.131"
-        
         response = requests.post(f"{self.api_url}/{method}", data=params, timeout=30)
         data = response.json()
-        
         if "error" in data:
             err = data["error"]
             print(f"❌ VK API Error {err['error_code']}: {err['error_msg']}")
@@ -32,7 +30,7 @@ class VKUploader:
         
         owner_id = -abs(int(self.group_id))
         attachments = []
-        vk_photo_urls = []  # Массив для хранения URL всех загруженных фото
+        vk_photo_urls = []
         
         footer_parts = [f"📢 Источник: {self.source_name}"]
         if forwarded_from and not forwarded_from.startswith('@'):
@@ -47,11 +45,17 @@ class VKUploader:
         if photo_urls:
             print(f"📤 Загружаем {len(photo_urls)} фото...")
             for index, photo_url in enumerate(photo_urls[:10], start=1):
+                # Проверка URL
+                if not photo_url or "http" not in photo_url:
+                    print(f"❌ Невалидный URL фото: {photo_url}")
+                    continue
+                
                 temp_file = f"temp_{int(time.time())}_{index}.jpg"
                 try:
                     print(f"[{index}] Скачиваем фото...")
                     img = requests.get(photo_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
                     if img.status_code != 200:
+                        print(f"❌ Не удалось скачать изображение (код: {img.status_code})")
                         continue
                     
                     with open(temp_file, "wb") as f:
@@ -59,12 +63,30 @@ class VKUploader:
                     
                     upload_server = self._api_call("photos.getWallUploadServer", {"group_id": self.group_id})
                     if not upload_server:
+                        print("❌ Не получен сервер загрузки")
                         continue
                     
                     with open(temp_file, "rb") as f:
                         upload_response = requests.post(upload_server["upload_url"], files={"photo": f}, timeout=60).json()
                     
-                    if "error" in upload_response or not all(x in upload_response for x in ("server", "photo", "hash")):
+                    print("📤 UPLOAD RESPONSE:")
+                    print(upload_response)
+                    
+                    if "error" in upload_response:
+                        print(f"❌ Ошибка загрузки: {upload_response.get('error', 'Unknown')}")
+                        continue
+                    
+                    if "photo" not in upload_response:
+                        print("❌ Нет параметра 'photo' в ответе VK")
+                        print(f"   Доступные поля: {list(upload_response.keys())}")
+                        continue
+                    
+                    if "server" not in upload_response:
+                        print("❌ Нет параметра 'server' в ответе VK")
+                        continue
+                    
+                    if "hash" not in upload_response:
+                        print("❌ Нет параметра 'hash' в ответе VK")
                         continue
                     
                     saved = self._api_call("photos.saveWallPhoto", {
@@ -74,18 +96,28 @@ class VKUploader:
                         "hash": upload_response["hash"],
                     })
                     
-                    if saved and len(saved) > 0:
-                        photo = saved[0]
-                        attachment = f"photo{photo['owner_id']}_{photo['id']}"
-                        attachments.append(attachment)
-                        
-                        if "sizes" in photo and photo["sizes"]:
-                            largest_size = max(photo["sizes"], key=lambda x: x.get("width", 0))
-                            vk_photo_urls.append(largest_size["url"])
-                            
-                        print(f"✅ Фото сохранено: {attachment}")
+                    print("💾 SAVE RESPONSE:")
+                    print(saved)
+                    
+                    if not saved:
+                        print("❌ photos.saveWallPhoto вернул None")
+                        continue
+                    
+                    if not isinstance(saved, list) or len(saved) == 0:
+                        print(f"❌ Ожидался список фото, получено: {saved}")
+                        continue
+                    
+                    photo = saved[0]
+                    attachment = f"photo{photo['owner_id']}_{photo['id']}"
+                    attachments.append(attachment)
+                    
+                    if "sizes" in photo and photo["sizes"]:
+                        largest = max(photo["sizes"], key=lambda x: x.get("width", 0))
+                        vk_photo_urls.append(largest["url"])
+                    
+                    print(f"✅ Фото сохранено: {attachment}")
                 except Exception as e:
-                    print(f"❌ Ошибка загрузки фото: {e}")
+                    print(f"❌ Ошибка: {e}")
                 finally:
                     if os.path.exists(temp_file):
                         os.remove(temp_file)
@@ -95,13 +127,13 @@ class VKUploader:
             return None
             
         print("📝 Создаем запись на стене...")
-        # from_group=1 гарантирует публикацию ОТ ИМЕНИ ГРУППЫ, а не админа
         post_params = {"owner_id": owner_id, "from_group": 1, "message": full_message[:4096]}
         if attachments:
             post_params["attachments"] = ",".join(attachments)
             
         post = self._api_call("wall.post", post_params)
         if not post:
+            print("❌ Не удалось создать пост")
             return None
             
         post_url = f"https://vk.com/wall{owner_id}_{post['post_id']}"
@@ -110,7 +142,7 @@ class VKUploader:
         return {
             "post_id": post["post_id"],
             "post_url": post_url,
-            "photo_urls": vk_photo_urls,  # Возвращаем ВСЕ URL
+            "photo_urls": vk_photo_urls,
             "photo_url": vk_photo_urls[0] if vk_photo_urls else None,
             "attachments": attachments,
         }
