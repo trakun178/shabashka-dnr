@@ -76,18 +76,13 @@
     />
     <link rel="manifest" href="manifest.json" />
     <link rel="shortcut icon" href="images/favicon.ico" />
+    <!-- Theme-color поддерживается Chrome/Safari, опционально для Firefox -->
     <meta name="theme-color" content="#FFB800" />
-
     <link rel="preconnect" href="https://krftmuyrshvgbdsstidf.supabase.co" />
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
     <link rel="preconnect" href="https://images.weserv.nl" />
     <link rel="dns-prefetch" href="https://images.weserv.nl" />
 
-    <script
-      type="text/javascript"
-      src="https://gc.kis.v2.scr.kaspersky-labs.com/FD126C42-EBFA-4E12-B309-BB3FDD723AC1/main.js?attr=LVlsspoje1LfRWmOwMGpLH4h9N5RdXTjYjca_RvRA6VzdC01xHRgpw0GnqBcocmiptAkJqQiFZJKH-1APaXGmEv1AWFd6cZXSLNwvjgybDUyt9DPhF2LFpnoVjEuaWA3XL0NjgKrst_t7vTGg6DBWc9UsKno2Hui8y3f233EpfOQSEaDpY6NmHeAA-7bER4IZWXNC4tJe3rzfNK7rHktDcZ8ls3HRapdx7Y_RCHIL5jBNUbUYIDHcbi-Md8aRiNeBD6Utn4i7LUsu7ITjEuwFlDbcRA4CqeU-9Bds2Wzo32QnPT7Sy0idQ2lSWGDbfhVn-pYWWaCncJDHKmsXCz5B1NpFBw4wadJzqy7gYrYKgwMFWTqnd4pY6xtz5paRhLHwU5Ewh7aAcbI9dtjSuv3AQsr9202elwRekqEb4M0UgHSiU50c8eSU6RFPWG6v1sPaVDyUk7mkB9VA2aFpQlff-kh0R79HTa-6cgZAFZNCpKCDF58KBeRxCX_jQpitDf83JY2TND1rQLNF97n07mKzUoO04frgYAvhm4X6N_wu3CkfigCFsyApDRLlh0RBm3yAfES4WnC58ciM22-Lcoe8vP9tpvvdibLF-Xkx7ap1S0WDpGXR4I1rJm0gQ3WI5qyL9T8mH0VAoTwD0TMj47OyQ319a9E5jI0tZo2w18TGQkAOlGWdY-AIOc6ykTOzB_xsVfL41uDOP0kq8HW2BdbZoTEqGsmH4L1JMaomMfcPc0TyBCd2V5OIDs3_FL7Av41jWN06jCcNEg5jQ7yWiD8IopgX0cSpZ5-5eAachDWKXid3YiX8eE9Wa9gMssetT-jT5Ht1Ze57ufT6C1JyP9ysQ3APWDh7IaajbuByTCawToUkRyruRx8snDhyTsnn2IBl_RsDWljbxwQm5zgY8S6ZiGBp6b-y_nWimclQNJFMqP7jXJrLeh77c5lVqziFkd8C2KoP-sYojZyv8wdLY1aL52vLpUvlnQaOPhQLMwxAoRcQkwMY4CUj_tC-v1CK6Zr9cVCqF-XW9Ghua-Q3rsmm7x4_2JEOKINzi9l2WLVBLyTfr7XEbwCEeJphgT-aCVhx3pedJJ0FxoMuNvLNDwkEYNAOccvSdyaUlh5qo4vx9rLh6D119MMbU1coivNJEQpUYeSetLVz9E6l7jDwYdzZaNTmts0Ehf4UoLuZjoXF5yB5aR6WNy2wti51At7MP-IZv2frzIoLjT4eIE18oaASmZUSkcDP9B0mTPpUASZqGMZJas5ZKJinGt13a38p3cMYZ06K4rSu8l7tdm2IKJv-I0TUoyITPm9iM8yWyFtOlnWEXYrwqbPmMay6jQQp990o99G5s-ygU979LBJeuRIvMRorWAaRlTS022--QusThMAwZ1fSLZ1tOXDiSwxmwY6rZliaPm4azvm37Uz3zQvDOOiQrT64tN4aZFHXyOEfLu0n55Rwg7oyKnMIahwuBhuDrlsVClxxAhPYg2GD851Xg"
-      charset="UTF-8"
-    ></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <link
@@ -120,10 +115,18 @@
         margin: 0;
         padding: 0;
         box-sizing: border-box;
+        /* ✅ ИСПРАВЛЕНО: user-select после -webkit-user-select */
         -webkit-user-select: none;
         -moz-user-select: none;
         -ms-user-select: none;
         user-select: none;
+      }
+
+      /* ✅ ИСПРАВЛЕНИЕ МОБИЛЬНОГО СДВИГА */
+      html,
+      body {
+        overflow-x: hidden;
+        max-width: 100vw;
       }
 
       body {
@@ -163,7 +166,7 @@
         text-align: center;
         font-weight: 700;
         font-size: 0.9rem;
-        min-width: 180px;
+        min-width: 150px;
         max-width: 220px;
         box-shadow: 0 2px 8px rgba(255, 184, 0, 0.4);
         border: 2px solid #ffb800;
@@ -219,6 +222,7 @@
 
       .container {
         max-width: 900px;
+        width: 100%;
         margin: 0 auto;
         padding: 2rem 1rem;
         flex: 1;
@@ -240,6 +244,8 @@
         background: white;
         font-weight: 600;
         color: #1a1a1a;
+        flex: 1;
+        min-width: 200px;
       }
 
       .filters select:focus,
@@ -247,11 +253,6 @@
         outline: none;
         border-color: #ff8c00;
         box-shadow: 0 0 0 3px rgba(255, 184, 0, 0.3);
-      }
-
-      .filters input {
-        flex: 1;
-        min-width: 200px;
       }
 
       .ads-list {
@@ -269,7 +270,9 @@
           transform 0.2s,
           box-shadow 0.2s;
         width: 100%;
+        max-width: 100%;
         border-left: 4px solid #ffb800;
+        word-wrap: break-word;
       }
 
       .ad-card:hover {
@@ -289,7 +292,7 @@
 
       .ad-photos {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: 0.5rem;
         padding: 0.5rem;
         background: #f5f5f5;
@@ -297,7 +300,7 @@
 
       .ad-photo {
         width: 100%;
-        height: 300px;
+        height: 250px;
         object-fit: cover;
         border-radius: 8px;
         cursor: pointer;
@@ -458,6 +461,11 @@
         box-shadow: 0 4px 12px rgba(255, 184, 0, 0.3);
         font-weight: 600;
         border: 2px solid #ffb800;
+        display: none; /* ✅ УБРАНО: inline style, теперь в CSS */
+      }
+
+      .ad-banner.active {
+        display: block !important;
       }
 
       .ad-banner h3 {
@@ -489,17 +497,24 @@
         box-shadow: 0 4px 12px rgba(255, 184, 0, 0.5);
       }
 
+      /* ✅ УМНАЯ И КОМПАКТНАЯ ПАГИНАЦИЯ */
       .pagination {
         display: flex;
         justify-content: center;
         align-items: center;
-        gap: 0.5rem;
+        gap: 0.4rem;
         margin-top: 2rem;
         flex-wrap: wrap;
       }
 
-      .pagination button {
-        padding: 0.75rem 1.25rem;
+      .pagination button,
+      .pagination span {
+        min-width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 0.5rem;
         border: 2px solid #ffb800;
         background: white;
         color: #1a1a1a;
@@ -507,6 +522,7 @@
         cursor: pointer;
         font-weight: 700;
         transition: all 0.2s;
+        font-size: 0.95rem;
       }
 
       .pagination button:hover:not(:disabled) {
@@ -516,8 +532,9 @@
       }
 
       .pagination button:disabled {
-        opacity: 0.5;
+        opacity: 0.4;
         cursor: not-allowed;
+        border-color: #ccc;
       }
 
       .pagination button.active {
@@ -525,11 +542,22 @@
         color: #000;
       }
 
+      .pagination span.dots {
+        border: none;
+        background: transparent;
+        color: #666;
+        cursor: default;
+        font-weight: 400;
+        font-size: 1.2rem;
+        padding: 0 0.2rem;
+      }
+
       .pagination-info {
         text-align: center;
         color: #555;
         font-weight: 600;
         margin-top: 1rem;
+        font-size: 0.9rem;
       }
 
       .modal {
@@ -588,8 +616,8 @@
         font-size: 40px;
         cursor: pointer;
         padding: 20px;
-        user-select: none;
         -webkit-user-select: none;
+        user-select: none;
         transition: color 0.3s ease;
         z-index: 10001;
       }
@@ -670,6 +698,14 @@
         width: 32px;
         height: 32px;
         object-fit: contain;
+        filter: brightness(0) invert(0.8);
+        transition:
+          transform 0.2s,
+          filter 0.2s;
+      }
+
+      .social-links a:hover .max-icon {
+        filter: sepia(1) saturate(5) hue-rotate(10deg) brightness(1.2);
       }
 
       .footer-links {
@@ -707,6 +743,7 @@
         font-weight: 600;
       }
 
+      /* ✅ МОБИЛЬНАЯ АДАПТАЦИЯ */
       @media (max-width: 768px) {
         .header-content {
           flex-direction: column;
@@ -729,6 +766,7 @@
         .filters input,
         .filters select {
           width: 100%;
+          min-width: 100%;
         }
 
         .ad-description {
@@ -739,18 +777,46 @@
           max-height: 400px;
         }
 
+        .ad-photos {
+          grid-template-columns: 1fr;
+        }
+
+        .ad-photo {
+          height: 200px;
+        }
+
         .pagination {
           gap: 0.3rem;
         }
 
-        .pagination button {
-          padding: 0.6rem 1rem;
-          font-size: 0.9rem;
+        .pagination button,
+        .pagination span {
+          min-width: 36px;
+          height: 36px;
+          font-size: 0.85rem;
+          padding: 0 0.3rem;
         }
 
         .ad-link,
         .vk-link {
           max-width: 100%;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .container {
+          padding: 1rem 0.5rem;
+        }
+
+        .ad-content {
+          padding: 1rem;
+        }
+
+        .pagination button,
+        .pagination span {
+          min-width: 32px;
+          height: 32px;
+          font-size: 0.8rem;
         }
       }
     </style>
@@ -760,7 +826,7 @@
       <div class="header-content">
         <div class="header-ad">
           <div class="ad-label">Реклама</div>
-          <div class="ad-title">🔧 Мастер на час</div>
+          <div class="ad-title">Мастер на час</div>
           <div class="ad-desc">Ремонт любой сложности. Звоните!</div>
         </div>
 
@@ -782,7 +848,8 @@
     </header>
 
     <div class="container">
-      <div class="ad-banner" id="adBanner" style="display: none">
+      <!-- ✅ УБРАНО: inline style="display: none" -->
+      <div class="ad-banner" id="adBanner">
         <h3>Разместите свою рекламу здесь!</h3>
         <p>Ваше объявление увидят тысячи людей</p>
         <a
@@ -906,7 +973,7 @@
             <i class="fab fa-telegram-plane"></i>
           </a>
           <a
-            href="https://max.ru/join/YIws3_0VQImS34uLVJiloEMMZTDiyC0nc_ES8yrxKoI"
+            href="https://max.ru/channel_dnrsabbath"
             target="_blank"
             rel="noopener noreferrer"
             title="MAX"
@@ -975,11 +1042,12 @@
           if (data) {
             const banner = document.getElementById("adBanner");
             banner.innerHTML = `<h3>${data.title}</h3><p>${data.description}</p><a href="${data.link}" target="_blank" rel="noopener noreferrer">${data.button_text || "Подробнее"}</a>`;
-            banner.style.display = "block";
+            banner.classList.add("active"); // ✅ ИСПРАВЛЕНО: используем класс вместо style.display
           }
         } catch (error) {}
       }
 
+      // ✅ УМНАЯ ПАГИНАЦИЯ
       function renderPagination() {
         const totalPages = Math.ceil(filteredAds.length / adsPerPage);
         const paginationDiv = document.getElementById("pagination");
@@ -992,36 +1060,52 @@
         }
 
         let html = "";
-        html += `<button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? "disabled" : ""}>← Назад</button>`;
 
-        const maxVisible = 5;
-        let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
-        let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+        // Кнопка "Назад"
+        html += `<button ${currentPage === 1 ? "disabled" : ""} onclick="changePage(${currentPage - 1})">←</button>`;
 
-        if (endPage - startPage < maxVisible - 1) {
-          startPage = Math.max(1, endPage - maxVisible + 1);
+        // Логика умного отображения страниц
+        const delta = 1; // Сколько страниц показывать слева и справа от текущей
+        const range = [];
+        const rangeWithDots = [];
+
+        for (let i = 1; i <= totalPages; i++) {
+          if (
+            i === 1 ||
+            i === totalPages ||
+            (i >= currentPage - delta && i <= currentPage + delta)
+          ) {
+            range.push(i);
+          }
         }
 
-        if (startPage > 1) {
-          html += `<button onclick="changePage(1)">1</button>`;
-          if (startPage > 2) html += `<span style="color: #666;">...</span>`;
+        let prev;
+        for (let i of range) {
+          if (prev) {
+            if (i - prev === 2) {
+              rangeWithDots.push(prev + 1);
+            } else if (i - prev !== 1) {
+              rangeWithDots.push("...");
+            }
+          }
+          rangeWithDots.push(i);
+          prev = i;
         }
 
-        for (let i = startPage; i <= endPage; i++) {
-          html += `<button onclick="changePage(${i})" class="${i === currentPage ? "active" : ""}">${i}</button>`;
+        // Рендер кнопок страниц
+        for (let i of rangeWithDots) {
+          if (i === "...") {
+            html += `<span class="dots">...</span>`;
+          } else {
+            html += `<button class="${i === currentPage ? "active" : ""}" onclick="changePage(${i})">${i}</button>`;
+          }
         }
 
-        if (endPage < totalPages) {
-          if (endPage < totalPages - 1)
-            html += `<span style="color: #666;">...</span>`;
-          html += `<button onclick="changePage(${totalPages})">${totalPages}</button>`;
-        }
-
-        html += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? "disabled" : ""}>Вперед →</button>`;
+        // Кнопка "Вперед"
+        html += `<button ${currentPage === totalPages ? "disabled" : ""} onclick="changePage(${currentPage + 1})">→</button>`;
 
         paginationDiv.innerHTML = html;
-        infoDiv.innerHTML = `Страница ${currentPage} из ${totalPages} (Всего: ${filteredAds.length} объявлений)`;
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        infoDiv.innerHTML = `Стр. ${currentPage} из ${totalPages} (Всего: ${filteredAds.length})`;
       }
 
       function changePage(page) {
@@ -1030,6 +1114,10 @@
         currentPage = page;
         renderCurrentPage();
         renderPagination();
+        // Плавная прокрутка к началу списка объявлений
+        document
+          .getElementById("adsContainer")
+          .scrollIntoView({ behavior: "smooth", block: "start" });
       }
 
       function renderCurrentPage() {
@@ -1064,7 +1152,6 @@
                   : ad.description || "Без описания";
             }
 
-            // ✅ Убираем ведущие пробелы и переносы строк, сохраняя форматирование
             let description = ad.description
               ? ad.description.trim()
               : "Нет описания";
@@ -1105,8 +1192,8 @@
                 <div class="ad-description ${hasLongText ? "collapsed" : ""}" id="desc-${ad.tg_message_id}">${description}</div>
                 ${hasLongText ? `<button class="expand-btn show" onclick="toggleExpand(${ad.tg_message_id}, this)">Показать полностью</button>` : ""}
                 <div class="ad-meta">
-                  <span> ${ad.city || "Донецк"}</span>
-                  ${ad.phone ? `<span> ${ad.phone}</span>` : ""}
+                  <span>📍 ${ad.city || "Донецк"}</span>
+                  ${ad.phone ? `<span>📞 ${ad.phone}</span>` : ""}
                   ${ad.forwarded_from ? `<span>↪️ ${ad.forwarded_from}</span>` : ""}
                   <span>🕐 ${new Date(ad.created_at).toLocaleString("ru-RU")}</span>
                 </div>
