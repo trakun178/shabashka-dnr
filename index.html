@@ -78,6 +78,7 @@
     <link rel="shortcut icon" href="images/favicon.ico" />
     <!-- Theme-color поддерживается Chrome/Safari, опционально для Firefox -->
     <meta name="theme-color" content="#FFB800" />
+    <meta http-equiv="Cache-Control" content="public, max-age=86400" />
     <link rel="preconnect" href="https://krftmuyrshvgbdsstidf.supabase.co" />
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
     <link rel="preconnect" href="https://images.weserv.nl" />
@@ -1016,7 +1017,9 @@
           const { data, error } = await supabaseClient
             .from("ads")
             .select("*")
-            .order("created_at", { ascending: false });
+            .order("created_at", { ascending: false })
+            .range(0, 49); // ✅ Загружаем только первые 50 объявлений
+
           if (error) throw error;
           allAds = data || [];
           filteredAds = [...allAds];
