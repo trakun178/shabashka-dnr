@@ -1003,7 +1003,7 @@
       let allAds = [];
       let filteredAds = [];
       let currentPage = 1;
-      const adsPerPage = 20;
+      const adsPerPage = 20; // ✅ Пагинация по 20 объявлений
       let currentPhotos = [];
       let currentPhotoIndex = 0;
 
@@ -1012,8 +1012,8 @@
           const { data, error } = await supabaseClient
             .from("ads")
             .select("*")
-            .order("created_at", { ascending: false })
-            .range(0, 19);
+            .order("created_at", { ascending: false });
+          // ✅ Убрали .range(0, 19) - загружаем ВСЕ объявления
 
           if (error) throw error;
           allAds = data || [];
