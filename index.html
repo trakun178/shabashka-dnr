@@ -76,9 +76,8 @@
     />
     <link rel="manifest" href="manifest.json" />
     <link rel="shortcut icon" href="images/favicon.ico" />
-    <!-- Theme-color поддерживается Chrome/Safari, опционально для Firefox -->
     <meta name="theme-color" content="#FFB800" />
-    <meta http-equiv="Cache-Control" content="public, max-age=86400" />
+
     <link rel="preconnect" href="https://krftmuyrshvgbdsstidf.supabase.co" />
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
     <link rel="preconnect" href="https://images.weserv.nl" />
@@ -116,14 +115,12 @@
         margin: 0;
         padding: 0;
         box-sizing: border-box;
-        /* ✅ ИСПРАВЛЕНО: user-select после -webkit-user-select */
         -webkit-user-select: none;
         -moz-user-select: none;
         -ms-user-select: none;
         user-select: none;
       }
 
-      /* ✅ ИСПРАВЛЕНИЕ МОБИЛЬНОГО СДВИГА */
       html,
       body {
         overflow-x: hidden;
@@ -274,6 +271,7 @@
         max-width: 100%;
         border-left: 4px solid #ffb800;
         word-wrap: break-word;
+        min-height: 300px;
       }
 
       .ad-card:hover {
@@ -462,7 +460,7 @@
         box-shadow: 0 4px 12px rgba(255, 184, 0, 0.3);
         font-weight: 600;
         border: 2px solid #ffb800;
-        display: none; /* ✅ УБРАНО: inline style, теперь в CSS */
+        display: none;
       }
 
       .ad-banner.active {
@@ -498,7 +496,6 @@
         box-shadow: 0 4px 12px rgba(255, 184, 0, 0.5);
       }
 
-      /* ✅ УМНАЯ И КОМПАКТНАЯ ПАГИНАЦИЯ */
       .pagination {
         display: flex;
         justify-content: center;
@@ -617,8 +614,8 @@
         font-size: 40px;
         cursor: pointer;
         padding: 20px;
-        -webkit-user-select: none;
         user-select: none;
+        -webkit-user-select: none;
         transition: color 0.3s ease;
         z-index: 10001;
       }
@@ -744,7 +741,6 @@
         font-weight: 600;
       }
 
-      /* ✅ МОБИЛЬНАЯ АДАПТАЦИЯ */
       @media (max-width: 768px) {
         .header-content {
           flex-direction: column;
@@ -827,7 +823,7 @@
       <div class="header-content">
         <div class="header-ad">
           <div class="ad-label">Реклама</div>
-          <div class="ad-title">Мастер на час</div>
+          <div class="ad-title">🔧 Мастер на час</div>
           <div class="ad-desc">Ремонт любой сложности. Звоните!</div>
         </div>
 
@@ -849,7 +845,6 @@
     </header>
 
     <div class="container">
-      <!-- ✅ УБРАНО: inline style="display: none" -->
       <div class="ad-banner" id="adBanner">
         <h3>Разместите свою рекламу здесь!</h3>
         <p>Ваше объявление увидят тысячи людей</p>
@@ -1008,7 +1003,7 @@
       let allAds = [];
       let filteredAds = [];
       let currentPage = 1;
-      const adsPerPage = 50;
+      const adsPerPage = 20;
       let currentPhotos = [];
       let currentPhotoIndex = 0;
 
@@ -1018,7 +1013,7 @@
             .from("ads")
             .select("*")
             .order("created_at", { ascending: false })
-            .range(0, 49); // ✅ Загружаем только первые 50 объявлений
+            .range(0, 19);
 
           if (error) throw error;
           allAds = data || [];
@@ -1045,12 +1040,11 @@
           if (data) {
             const banner = document.getElementById("adBanner");
             banner.innerHTML = `<h3>${data.title}</h3><p>${data.description}</p><a href="${data.link}" target="_blank" rel="noopener noreferrer">${data.button_text || "Подробнее"}</a>`;
-            banner.classList.add("active"); // ✅ ИСПРАВЛЕНО: используем класс вместо style.display
+            banner.classList.add("active");
           }
         } catch (error) {}
       }
 
-      // ✅ УМНАЯ ПАГИНАЦИЯ
       function renderPagination() {
         const totalPages = Math.ceil(filteredAds.length / adsPerPage);
         const paginationDiv = document.getElementById("pagination");
@@ -1064,11 +1058,9 @@
 
         let html = "";
 
-        // Кнопка "Назад"
         html += `<button ${currentPage === 1 ? "disabled" : ""} onclick="changePage(${currentPage - 1})">←</button>`;
 
-        // Логика умного отображения страниц
-        const delta = 1; // Сколько страниц показывать слева и справа от текущей
+        const delta = 1;
         const range = [];
         const rangeWithDots = [];
 
@@ -1095,7 +1087,6 @@
           prev = i;
         }
 
-        // Рендер кнопок страниц
         for (let i of rangeWithDots) {
           if (i === "...") {
             html += `<span class="dots">...</span>`;
@@ -1104,7 +1095,6 @@
           }
         }
 
-        // Кнопка "Вперед"
         html += `<button ${currentPage === totalPages ? "disabled" : ""} onclick="changePage(${currentPage + 1})">→</button>`;
 
         paginationDiv.innerHTML = html;
@@ -1117,7 +1107,6 @@
         currentPage = page;
         renderCurrentPage();
         renderPagination();
-        // Плавная прокрутка к началу списка объявлений
         document
           .getElementById("adsContainer")
           .scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1198,7 +1187,7 @@
                   <span>📍 ${ad.city || "Донецк"}</span>
                   ${ad.phone ? `<span>📞 ${ad.phone}</span>` : ""}
                   ${ad.forwarded_from ? `<span>↪️ ${ad.forwarded_from}</span>` : ""}
-                  <span>🕐 ${new Date(ad.created_at).toLocaleString("ru-RU")}</span>
+                  <span> ${new Date(ad.created_at).toLocaleString("ru-RU")}</span>
                 </div>
                 <div class="ad-buttons">
                   ${ad.post_link ? `<a href="${ad.post_link}" target="_blank" rel="noopener noreferrer" class="ad-link">Открыть в Telegram</a>` : ""}
