@@ -29,6 +29,25 @@ class VKUploader:
             return None
         return data.get("response")
 
+    def _is_image_by_magic(self, content):
+        """✅ Проверяет файл по магическим байтам, если Content-Type отсутствует/неверный."""
+        if not content:
+            return False
+        header = content[:16]
+        # JPEG
+        if header.startswith(b'\xff\xd8\xff'):
+            return True
+        # PNG
+        if header.startswith(b'\x89PNG\r\n\x1a\n'):
+            return True
+        # WEBP
+        if header[:4] == b'RIFF' and b'WEBP' in header[:16]:
+            return True
+        # GIF
+        if header.startswith(b'GIF87a') or header.startswith(b'GIF89a'):
+            return True
+        return False
+
     def post_with_photos(self, message, photo_urls=None, forwarded_from=None, post_link=None):
         if not self.group_id:
             print("❌ Не указан group_id")
@@ -64,15 +83,22 @@ class VKUploader:
                         print(f"❌ Не удалось скачать изображение (код: {img.status_code})")
                         continue
 
-                    # ✅ ВАЛИДАЦИЯ ДО ЗАГРУЗКИ В VK: только картинки, не тяжелее 5 МБ
-                    content_type = (img.headers.get("Content-Type") or "").split(";")[0].strip().lower()
-                    if not content_type.startswith("image/"):
-                        print(f"❌ Это не изображение (Content-Type: {content_type}) — пропускаем")
-                        continue
-
+                    # ✅ ВАЛИДАЦИЯ: проверяем размер и формат
                     if len(img.content) > self.VK_MAX_PHOTO_BYTES:
                         print(f"❌ Фото тяжелее 5 МБ ({len(img.content)} байт) — VK не примет, пропускаем")
                         continue
+
+                    content_type = (img.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+                    is_image = content_type.startswith("image/")
+
+                    # ✅ Если Telegram отдал application/octet-stream — проверяем магические байты
+                    if not is_image:
+                        if self._is_image_by_magic(img.content):
+                            is_image = True
+                            print(f"ℹ️ Content-Type: {content_type}, но файл — картинка (magic bytes OK)")
+                        else:
+                            print(f"❌ Это не изображение (Content-Type: {content_type}) и не проходит magic bytes — пропускаем")
+                            continue
 
                     with open(temp_file, "wb") as f:
                         f.write(img.content)
@@ -94,9 +120,7 @@ class VKUploader:
                         print(f"❌ Ошибка загрузки: {upload_response.get('error', 'Unknown')}")
                         continue
 
-                    # ✅ РАНЬШЕ: 'if "photo" not in upload_response' — но VK возвращает
-                    #    ключ photo с ПУСТОЙ строкой, если файл не прошёл валидацию.
-                    #    Теперь пустое photo ловится и не уезжает в saveWallPhoto.
+                    # ✅ Проверка пустого photo (из-за которого была Error 100)
                     if (
                         not upload_response.get("photo")
                         or not upload_response.get("server")
@@ -139,8 +163,6 @@ class VKUploader:
                         os.remove(temp_file)
 
         if not attachments and photo_urls:
-            # ✅ РАНЬШЕ здесь был return None — пост вообще не публиковался.
-            #    Теперь публикуем текстом: лучше пост без фото, чем пропущенное объявление.
             print("⚠️ Не удалось загрузить ни одной фотографии — публикуем пост без фото")
 
         print("📝 Создаем запись на стене...")
