@@ -2,3 +2,4 @@ requests
 supabase
 python-dotenv
 vk-api
+Pillow
