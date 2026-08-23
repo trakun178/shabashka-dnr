@@ -54,8 +54,7 @@ class VKUploader:
 
     def _normalize_image(self, content: bytes) -> bytes:
         """✅ Приводит фото к виду, который VK принимает ВСЕГДА:
-        RGB (убирает CMYK/альфа), сторона ≤ 2048 px, JPEG ≤ 5 МБ.
-        Лечит случаи «большой размер / высокое качество / странный формат»."""
+        RGB (убирает CMYK/альфа), сторона ≤ 2048 px, JPEG ≤ 5 МБ."""
         if not HAS_PIL:
             print("⚠️ Pillow не установлен — отправляем как есть")
             return content
@@ -94,6 +93,34 @@ class VKUploader:
             print(f"⚠️ Не удалось нормализовать фото ({e}) — отправляем как есть")
             return content
 
+    def _upload_photo_to_server(self, temp_file):
+        """✅ Загрузка фото на сервер VK С РЕТРАЯМИ: их upload-сервер иногда
+        возвращает пустой ответ или HTML вместо JSON. Пробуем до 3 раз,
+        каждый раз запрашивая новый upload server."""
+        for attempt in range(1, 4):
+            upload_server = self._api_call("photos.getWallUploadServer", {"group_id": self.group_id})
+            if not upload_server:
+                print("❌ Не получен сервер загрузки")
+                return None
+
+            try:
+                with open(temp_file, "rb") as f:
+                    resp = requests.post(upload_server["upload_url"], files={"photo": f}, timeout=90)
+            except Exception as e:
+                print(f"⚠️ Попытка {attempt}: сетевая ошибка при загрузке: {e}")
+                time.sleep(5)
+                continue
+
+            try:
+                return resp.json()
+            except ValueError:
+                print(f"⚠️ Попытка {attempt}: сервер VK вернул не JSON "
+                      f"(код {resp.status_code}): {resp.text[:200]!r}")
+                time.sleep(5)
+
+        print("❌ Все 3 попытки загрузки не дали валидного ответа VK")
+        return None
+
     def post_with_photos(self, message, photo_urls=None, forwarded_from=None, post_link=None):
         if not self.group_id:
             print("❌ Не указан group_id")
@@ -129,11 +156,13 @@ class VKUploader:
                         continue
 
                     content_type = (img.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+                    print(f"   Размер: {len(img.content)} байт, Content-Type: {content_type}")
+
                     is_image = content_type.startswith("image/")
                     if not is_image:
                         if self._is_image_by_magic(img.content):
                             is_image = True
-                            print(f"ℹ️ Content-Type: {content_type}, но файл — картинка (magic bytes OK)")
+                            print("ℹ️ Content-Type не image/*, но файл — картинка (magic bytes OK)")
                         else:
                             print(f"❌ Это не изображение (Content-Type: {content_type}) — пропускаем")
                             continue
@@ -148,15 +177,11 @@ class VKUploader:
                     with open(temp_file, "wb") as f:
                         f.write(content)
 
-                    upload_server = self._api_call("photos.getWallUploadServer", {"group_id": self.group_id})
-                    if not upload_server:
-                        print("❌ Не получен сервер загрузки")
+                    # ✅ Загрузка с ретраями вместо падения на .json()
+                    upload_response = self._upload_photo_to_server(temp_file)
+                    if upload_response is None:
+                        print("❌ Не удалось получить валидный ответ сервера загрузки VK — фото пропущено")
                         continue
-
-                    with open(temp_file, "rb") as f:
-                        upload_response = requests.post(
-                            upload_server["upload_url"], files={"photo": f}, timeout=60
-                        ).json()
 
                     print("📤 UPLOAD RESPONSE:")
                     print(upload_response)
