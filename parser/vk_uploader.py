@@ -53,50 +53,50 @@ class VKUploader:
         return False
 
     def _normalize_image(self, content: bytes) -> bytes:
-        """✅ Приводит фото к виду, который VK принимает ВСЕГДА:
-        RGB (убирает CMYK/альфа), сторона ≤ 2048 px, JPEG ≤ 5 МБ."""
+        """ВСЕГДА перекодирует фото в чистый baseline JPEG (RGB, <=2048px, <=5МБ).
+        Убирает любые особенности исходника, из-за которых VK молча отбраковывает
+        файл: CMYK/альфа, арифметическое кодирование, нестандартные маркеры,
+        экзотические профили. Перекодированный JPEG VK принимает всегда."""
         if not HAS_PIL:
             print("⚠️ Pillow не установлен — отправляем как есть")
             return content
         try:
             img = Image.open(io.BytesIO(content))
-            original_mode = img.mode
             original_format = img.format
-            resized = False
+            original_mode = img.mode
+
+            # Прозрачность -> на белый фон, всё остальное -> RGB
+            if img.mode in ("RGBA", "LA", "P"):
+                background = Image.new("RGB", img.size, (255, 255, 255))
+                background.paste(img, mask=img.convert("RGBA").getchannel("A"))
+                img = background
+            elif img.mode != "RGB":
+                img = img.convert("RGB")
 
             if max(img.size) > self.VK_MAX_SIDE:
                 img.thumbnail((self.VK_MAX_SIDE, self.VK_MAX_SIDE), Image.LANCZOS)
-                resized = True
-
-            # Маленький обычный JPEG не трогаем — не пережимаем без нужды
-            if (original_format == "JPEG" and original_mode == "RGB"
-                    and not resized and len(content) <= self.VK_MAX_PHOTO_BYTES):
-                return content
-
-            if img.mode != "RGB":
-                img = img.convert("RGB")
 
             buf = io.BytesIO()
             quality = 90
             while True:
                 buf.seek(0)
                 buf.truncate()
-                img.save(buf, format="JPEG", quality=quality, optimize=True)
+                img.save(buf, format="JPEG", quality=quality,
+                         optimize=True, progressive=False)
                 if buf.tell() <= self.VK_MAX_PHOTO_BYTES or quality <= 50:
                     break
                 quality -= 10
 
-            print(f"🖼 Фото нормализовано: {len(content)} → {buf.tell()} байт "
-                  f"(формат: {original_format}, режим: {original_mode})")
+            print(f"🖼 Фото перекодировано в JPEG: {len(content)} -> {buf.tell()} байт "
+                  f"(было: {original_format}/{original_mode})")
             return buf.getvalue()
         except Exception as e:
-            print(f"⚠️ Не удалось нормализовать фото ({e}) — отправляем как есть")
+            print(f"⚠️ Не удалось перекодировать фото ({e}) — отправляем как есть")
             return content
 
     def _upload_photo_to_server(self, temp_file):
-        """✅ Загрузка фото на сервер VK С РЕТРАЯМИ: их upload-сервер иногда
-        возвращает пустой ответ или HTML вместо JSON. Пробуем до 3 раз,
-        каждый раз запрашивая новый upload server."""
+        """Загрузка фото на сервер VK С РЕТРАЯМИ: их upload-сервер иногда
+        возвращает пустой ответ или HTML вместо JSON. До 3 попыток."""
         for attempt in range(1, 4):
             upload_server = self._api_call("photos.getWallUploadServer", {"group_id": self.group_id})
             if not upload_server:
@@ -167,11 +167,11 @@ class VKUploader:
                             print(f"❌ Это не изображение (Content-Type: {content_type}) — пропускаем")
                             continue
 
-                    # ✅ Нормализуем: RGB + ≤2048px + JPEG ≤5МБ
+                    # ✅ ВСЕГДА перекодируем в чистый baseline JPEG
                     content = self._normalize_image(img.content)
 
                     if len(content) > self.VK_MAX_PHOTO_BYTES:
-                        print(f"❌ Фото тяжелее 5 МБ даже после нормализации ({len(content)} байт) — пропускаем")
+                        print(f"❌ Фото тяжелее 5 МБ даже после перекодировки ({len(content)} байт) — пропускаем")
                         continue
 
                     with open(temp_file, "wb") as f:
