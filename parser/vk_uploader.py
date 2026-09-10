@@ -25,17 +25,27 @@ class VKUploader:
         print(f"✅ VK uploader инициализирован (группа: {self.group_id})")
 
     def _api_call(self, method, params=None):
-        if params is None:
-            params = {}
-        params["access_token"] = self.token
-        params["v"] = "5.131"
-        response = requests.post(f"{self.api_url}/{method}", data=params, timeout=30)
-        data = response.json()
-        if "error" in data:
-            err = data["error"]
-            print(f"❌ VK API Error {err['error_code']}: {err['error_msg']}")
-            return None
-        return data.get("response")
+        """Вызов метода VK с автоматическим откатом при Error 9 (Flood control):
+        ждём и повторяем, вместо того чтобы терять пост/фото."""
+        for attempt in range(1, 4):
+            if params is None:
+                params = {}
+            params["access_token"] = self.token
+            params["v"] = "5.131"
+            response = requests.post(f"{self.api_url}/{method}", data=params, timeout=30)
+            data = response.json()
+            if "error" in data:
+                err = data["error"]
+                if err.get("error_code") == 9 and attempt < 3:
+                    wait = 30 * attempt
+                    print(f"⏳ Flood control (Error 9) на {method}: "
+                          f"ждём {wait} сек и повторяем (попытка {attempt + 1}/3)")
+                    time.sleep(wait)
+                    continue
+                print(f"❌ VK API Error {err['error_code']}: {err['error_msg']}")
+                return None
+            return data.get("response")
+        return None
 
     def _is_image_by_magic(self, content):
         """Проверка по магическим байтам, если Content-Type отсутствует/неверный."""
@@ -54,11 +64,7 @@ class VKUploader:
 
     def _normalize_image(self, content: bytes) -> bytes:
         """Перекодирует фото в максимально чистый baseline JPEG:
-        - новый "холст" => без ICC-профилей, EXIF и маркеров исходника
-          (именно это обычно несёт в себе баннер из дизайн-редактора);
-        - RGB (убирает CMYK/альфу);
-        - сторона <= 1280 px (родной максимум VK);
-        - вес <= 5 МБ."""
+        новый "холст" (без ICC/EXIF), RGB, сторона <= 1280 px, вес <= 5 МБ."""
         if not HAS_PIL:
             print("⚠️ Pillow не установлен — отправляем как есть")
             return content
@@ -68,7 +74,6 @@ class VKUploader:
             original_mode = img.mode
             orig_w, orig_h = img.size
 
-            # Прозрачность -> на белый фон, всё остальное -> RGB
             if img.mode in ("RGBA", "LA", "P"):
                 rgb = Image.new("RGB", img.size, (255, 255, 255))
                 rgb.paste(img, mask=img.convert("RGBA").getchannel("A"))
@@ -79,7 +84,6 @@ class VKUploader:
             if max(img.size) > self.VK_MAX_SIDE:
                 img.thumbnail((self.VK_MAX_SIDE, self.VK_MAX_SIDE), Image.LANCZOS)
 
-            # ✅ Новый холст: гарантированно без icc_profile/exif/info исходника
             clean = Image.new("RGB", img.size, (255, 255, 255))
             clean.paste(img, (0, 0))
 
@@ -103,9 +107,8 @@ class VKUploader:
             return content
 
     def _upload_photo_to_server(self, temp_file):
-        """Загрузка фото на сервер VK. До 3 попыток при сетевых сбоях
-        и не-JSON ответах."""
-        for attempt in range(1, 4):
+        """Загрузка фото на сервер VK. До 2 попыток при сетевых сбоях/не-JSON."""
+        for attempt in range(1, 3):
             upload_server = self._api_call("photos.getWallUploadServer", {"group_id": self.group_id})
             if not upload_server:
                 print("❌ Не получен сервер загрузки")
@@ -126,7 +129,7 @@ class VKUploader:
                       f"(код {resp.status_code}): {resp.text[:200]!r}")
                 time.sleep(5)
 
-        print("❌ Все 3 попытки загрузки не дали валидного ответа VK")
+        print("❌ Попытки загрузки не дали валидного ответа VK")
         return None
 
     @staticmethod
@@ -184,7 +187,6 @@ class VKUploader:
                             print(f"❌ Это не изображение (Content-Type: {content_type}) — пропускаем")
                             continue
 
-                    # ✅ Чистый baseline JPEG
                     content = self._normalize_image(img.content)
 
                     if len(content) > self.VK_MAX_PHOTO_BYTES:
@@ -194,10 +196,9 @@ class VKUploader:
                     with open(temp_file, "wb") as f:
                         f.write(content)
 
-                    # ✅ До 3 попыток, если VK вернул пустое photo (глюки сервера
-                    #    и валидатора лечатся повтором с новым upload-сервером)
+                    # До 2 попыток, если VK вернул пустое photo
                     upload_response = None
-                    for attempt in range(1, 4):
+                    for attempt in range(1, 3):
                         upload_response = self._upload_photo_to_server(temp_file)
                         if upload_response is None:
                             break
@@ -247,10 +248,15 @@ class VKUploader:
                     if os.path.exists(temp_file):
                         os.remove(temp_file)
 
+                # ✅ Разрядка: пауза между API-вызовами разных фото,
+                #    чтобы не дразнить flood control
+                time.sleep(2)
+
         if not attachments and photo_urls:
             print("⚠️ Не удалось загрузить ни одной фотографии — публикуем пост без фото")
 
         print("📝 Создаем запись на стене...")
+        time.sleep(2)
         post_params = {"owner_id": owner_id, "from_group": 1, "message": full_message[:4096]}
         if attachments:
             post_params["attachments"] = ",".join(attachments)
