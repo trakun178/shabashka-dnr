@@ -22,11 +22,13 @@ class VKUploader:
         self.group_id = str(group_id) if group_id else None
         self.api_url = "https://api.vk.com/method"
         self.source_name = source_name
+        self.flood_blocked = False
         print(f"✅ VK uploader инициализирован (группа: {self.group_id})")
 
     def _api_call(self, method, params=None):
         """Вызов метода VK с автоматическим откатом при Error 9 (Flood control):
-        ждём и повторяем, вместо того чтобы терять пост/фото."""
+        ждём и повторяем; если блокировка длинная — ставим флаг flood_blocked,
+        чтобы до конца запуска не долбить VK и не продлевать блокировку."""
         for attempt in range(1, 4):
             if params is None:
                 params = {}
@@ -36,12 +38,15 @@ class VKUploader:
             data = response.json()
             if "error" in data:
                 err = data["error"]
-                if err.get("error_code") == 9 and attempt < 3:
-                    wait = 30 * attempt
-                    print(f"⏳ Flood control (Error 9) на {method}: "
-                          f"ждём {wait} сек и повторяем (попытка {attempt + 1}/3)")
-                    time.sleep(wait)
-                    continue
+                if err.get("error_code") == 9:
+                    if attempt < 3:
+                        wait = 60 * attempt
+                        print(f"⏳ Flood control (Error 9) на {method}: "
+                              f"ждём {wait} сек и повторяем (попытка {attempt + 1}/3)")
+                        time.sleep(wait)
+                        continue
+                    # Блокировка длинная — не тратим время и не продлеваем её
+                    self.flood_blocked = True
                 print(f"❌ VK API Error {err['error_code']}: {err['error_msg']}")
                 return None
             return data.get("response")
@@ -64,7 +69,10 @@ class VKUploader:
 
     def _normalize_image(self, content: bytes) -> bytes:
         """Перекодирует фото в максимально чистый baseline JPEG:
-        новый "холст" (без ICC/EXIF), RGB, сторона <= 1280 px, вес <= 5 МБ."""
+        - новый "холст" => без ICC-профилей, EXIF и маркеров исходника;
+        - RGB (убирает CMYK/альфу);
+        - сторона <= 1280 px (родной максимум VK);
+        - вес <= 5 МБ."""
         if not HAS_PIL:
             print("⚠️ Pillow не установлен — отправляем как есть")
             return content
@@ -74,6 +82,7 @@ class VKUploader:
             original_mode = img.mode
             orig_w, orig_h = img.size
 
+            # Прозрачность -> на белый фон, всё остальное -> RGB
             if img.mode in ("RGBA", "LA", "P"):
                 rgb = Image.new("RGB", img.size, (255, 255, 255))
                 rgb.paste(img, mask=img.convert("RGBA").getchannel("A"))
@@ -84,6 +93,7 @@ class VKUploader:
             if max(img.size) > self.VK_MAX_SIDE:
                 img.thumbnail((self.VK_MAX_SIDE, self.VK_MAX_SIDE), Image.LANCZOS)
 
+            # ✅ Новый холст: гарантированно без icc_profile/exif/info исходника
             clean = Image.new("RGB", img.size, (255, 255, 255))
             clean.paste(img, (0, 0))
 
@@ -146,6 +156,10 @@ class VKUploader:
             print("❌ Не указан group_id")
             return None
 
+        if self.flood_blocked:
+            print("⛔ VK во флуд-контроле — до конца запуска публикуем только на сайт")
+            return None
+
         owner_id = -abs(int(self.group_id))
         attachments = []
         vk_photo_urls = []
@@ -187,6 +201,7 @@ class VKUploader:
                             print(f"❌ Это не изображение (Content-Type: {content_type}) — пропускаем")
                             continue
 
+                    # ✅ Чистый baseline JPEG
                     content = self._normalize_image(img.content)
 
                     if len(content) > self.VK_MAX_PHOTO_BYTES:
@@ -248,8 +263,7 @@ class VKUploader:
                     if os.path.exists(temp_file):
                         os.remove(temp_file)
 
-                # ✅ Разрядка: пауза между API-вызовами разных фото,
-                #    чтобы не дразнить flood control
+                # ✅ Разрядка: пауза между API-вызовами разных фото
                 time.sleep(2)
 
         if not attachments and photo_urls:

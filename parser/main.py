@@ -308,8 +308,8 @@ def get_channel_updates():
                 # ✅ УМНАЯ ЗАДЕРЖКА: только если это не последний пост
                 is_last_album = (idx == len(group_keys) - 1) and (len(single_messages) == 0)
                 if not is_last_album:
-                    print("  ⏱️ Ожидание 65 секунд перед следующим постом...")
-                    time.sleep(65)
+                    print("  ⏱️ Ожидание 180 секунд перед следующим постом...")
+                    time.sleep(180)
 
         if combined_text or has_media:
             vk_post_url = vk_result['post_url'] if vk_result else None
@@ -392,8 +392,8 @@ def get_channel_updates():
 
                 # ✅ УМНАЯ ЗАДЕРЖКА: только если это не последний пост
                 if idx < len(single_messages) - 1:
-                    print("  ⏱️ Ожидание 65 секунд перед следующим постом...")
-                    time.sleep(65)
+                    print("  ⏱️ Ожидание 180 секунд перед следующим постом...")
+                    time.sleep(180)
 
         if text or has_media:
             vk_post_url = vk_result['post_url'] if vk_result else None
