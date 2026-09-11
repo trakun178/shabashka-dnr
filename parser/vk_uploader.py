@@ -12,10 +12,19 @@ except ImportError:
 
 
 class VKUploader:
-    """Публикация постов с фотографиями в группу ВКонтакте."""
+    """Публикация постов с фотографиями в группу ВКонтакте.
+
+    Схема загрузки фото:
+    1) Если ключ умеет photos.getWallUploadServer — грузим через него (старая схема).
+    2) Если ключ отвечает Error 27 (групповые токены нового образца) —
+       автоматически переключаемся на загрузку в служебный альбом группы
+       (photos.getUploadServer + photos.save): такие фото прикрепляются
+       к посту на стене как обычные и отдают CDN-ссылку для сайта.
+    """
 
     VK_MAX_PHOTO_BYTES = 5 * 1024 * 1024  # лимит VK на одно фото
     VK_MAX_SIDE = 1280                    # родной максимум VK для ленты
+    ALBUM_TITLE = "Фото объявлений (сайт)"
 
     def __init__(self, token, group_id=None, source_name="Шабашка DNR, Донецк, Макеевка"):
         self.token = token
@@ -23,13 +32,13 @@ class VKUploader:
         self.api_url = "https://api.vk.com/method"
         self.source_name = source_name
         self.flood_blocked = False
-        self.use_messages_upload = False
+        self.use_album_upload = False
+        self.album_id = None
         self.last_error_code = None
         print(f"✅ VK uploader инициализирован (группа: {self.group_id})")
 
     def _api_call(self, method, params=None):
-        """Вызов метода VK с откатом при Error 9 (Flood control).
-        Запоминает код последней ошибки в self.last_error_code."""
+        """Вызов метода VK с откатом при Error 9 (Flood control)."""
         for attempt in range(1, 4):
             if params is None:
                 params = {}
@@ -47,7 +56,6 @@ class VKUploader:
                               f"ждём {wait} сек и повторяем (попытка {attempt + 1}/3)")
                         time.sleep(wait)
                         continue
-                    # Блокировка длинная — не тратим время и не продлеваем её
                     self.flood_blocked = True
                 print(f"❌ VK API Error {self.last_error_code}: {err['error_msg']}")
                 return None
@@ -55,37 +63,75 @@ class VKUploader:
             return data.get("response")
         return None
 
-    def _get_upload_server(self):
-        """✅ Возвращает (upload_url, save_method).
-        Если photos.getWallUploadServer недоступен групповому токену (Error 27) —
-        автоматически и навсегда переключается на messages-сервер загрузки."""
-        if not self.use_messages_upload:
+    def _ensure_album(self):
+        """Находит или создаёт служебный альбом группы для фото объявлений."""
+        if self.album_id:
+            return self.album_id
+        albums = self._api_call("photos.getAlbums", {"group_id": self.group_id})
+        if albums is not None:
+            for item in albums.get("items", []):
+                if item.get("title") == self.ALBUM_TITLE:
+                    self.album_id = item["id"]
+                    print(f"ℹ️ Найден служебный альбом: {self.album_id}")
+                    return self.album_id
+        created = self._api_call("photos.createAlbum", {
+            "group_id": self.group_id,
+            "title": self.ALBUM_TITLE,
+            "description": "Сюда парсер складывает фото объявлений для постов на стене",
+        })
+        if created:
+            self.album_id = created["id"]
+            print(f"ℹ️ Создан служебный альбом: {self.album_id}")
+        return self.album_id
+
+    def _get_upload_target(self):
+        """Возвращает (upload_url, route), route: 'wall' или 'album'."""
+        if not self.use_album_upload:
             server = self._api_call("photos.getWallUploadServer", {"group_id": self.group_id})
             if server:
                 return server.get("upload_url"), "wall"
             if self.last_error_code == 27:
-                print("ℹ️ getWallUploadServer недоступен с групповым токеном (Error 27) — "
-                      "переключаемся на messages-сервер загрузки")
-                self.use_messages_upload = True
+                print("ℹ️ getWallUploadServer недоступен этому ключу (Error 27) — "
+                      "переключаемся на загрузку в альбом группы")
+                self.use_album_upload = True
             else:
                 return None, None
 
-        server = self._api_call("photos.getMessagesUploadServer", {"group_id": self.group_id})
+        album_id = self._ensure_album()
+        if not album_id:
+            print("❌ Не удалось получить/создать альбом для фото")
+            return None, None
+        server = self._api_call("photos.getUploadServer",
+                                {"group_id": self.group_id, "album_id": album_id})
         if server:
-            return server.get("upload_url"), "messages"
+            return server.get("upload_url"), "album"
         return None, None
 
-    def _save_photo(self, save_method, upload_response):
-        """Сохранение загруженного фото нужным методом."""
-        params = {
+    @staticmethod
+    def _upload_response_ok(upload_response, route):
+        if not upload_response:
+            return False
+        if not upload_response.get("server") or not upload_response.get("hash"):
+            return False
+        if route == "wall":
+            return bool(upload_response.get("photo"))
+        return bool(upload_response.get("photos_list"))
+
+    def _save_photo(self, route, upload_response):
+        if route == "wall":
+            return self._api_call("photos.saveWallPhoto", {
+                "group_id": self.group_id,
+                "server": upload_response["server"],
+                "photo": upload_response["photo"],
+                "hash": upload_response["hash"],
+            })
+        return self._api_call("photos.save", {
+            "group_id": self.group_id,
+            "album_id": self.album_id,
             "server": upload_response["server"],
-            "photo": upload_response["photo"],
+            "photos_list": upload_response["photos_list"],
             "hash": upload_response["hash"],
-        }
-        if save_method == "wall":
-            params["group_id"] = self.group_id
-            return self._api_call("photos.saveWallPhoto", params)
-        return self._api_call("photos.saveMessagesPhoto", params)
+        })
 
     def _is_image_by_magic(self, content):
         """Проверка по магическим байтам, если Content-Type отсутствует/неверный."""
@@ -103,8 +149,8 @@ class VKUploader:
         return False
 
     def _normalize_image(self, content: bytes) -> bytes:
-        """Перекодирует фото в максимально чистый baseline JPEG:
-        новый "холст" (без ICC/EXIF), RGB, сторона <= 1280 px, вес <= 5 МБ."""
+        """Перекодирует фото в чистый baseline JPEG: новый "холст" (без ICC/EXIF),
+        RGB, сторона <= 1280 px, вес <= 5 МБ."""
         if not HAS_PIL:
             print("⚠️ Pillow не установлен — отправляем как есть")
             return content
@@ -147,10 +193,10 @@ class VKUploader:
             return content
 
     def _upload_photo_to_server(self, temp_file):
-        """Загрузка фото на сервер VK. Возвращает (response, save_method).
-        До 2 попыток при сетевых сбоях/не-JSON."""
+        """Скачанный и перекодированный файл укладывается на сервер VK.
+        Возвращает (response, route). До 2 попыток при сбоях."""
         for attempt in range(1, 3):
-            upload_url, save_method = self._get_upload_server()
+            upload_url, route = self._get_upload_target()
             if not upload_url:
                 print("❌ Не получен сервер загрузки")
                 return None, None
@@ -164,7 +210,7 @@ class VKUploader:
                 continue
 
             try:
-                return resp.json(), save_method
+                return resp.json(), route
             except ValueError:
                 print(f"⚠️ Попытка {attempt}: сервер VK вернул не JSON "
                       f"(код {resp.status_code}): {resp.text[:200]!r}")
@@ -172,15 +218,6 @@ class VKUploader:
 
         print("❌ Попытки загрузки не дали валидного ответа VK")
         return None, None
-
-    @staticmethod
-    def _upload_response_ok(upload_response):
-        return bool(
-            upload_response
-            and upload_response.get("photo")
-            and upload_response.get("server")
-            and upload_response.get("hash")
-        )
 
     def post_with_photos(self, message, photo_urls=None, forwarded_from=None, post_link=None):
         if not self.group_id:
@@ -214,6 +251,7 @@ class VKUploader:
 
                 temp_file = f"temp_{int(time.time())}_{index}.jpg"
                 try:
+                    # ✅ СНАЧАЛА скачиваем и форматируем под VK, потом стучимся в VK
                     print(f"[{index}] Скачиваем фото...")
                     img = requests.get(photo_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
                     if img.status_code != 200 or not img.content:
@@ -241,27 +279,24 @@ class VKUploader:
                     with open(temp_file, "wb") as f:
                         f.write(content)
 
-                    # До 2 попыток, если VK вернул пустое photo
-                    upload_response = None
-                    save_method = None
+                    upload_response, route = None, None
                     for attempt in range(1, 3):
-                        upload_response, save_method = self._upload_photo_to_server(temp_file)
+                        upload_response, route = self._upload_photo_to_server(temp_file)
                         if upload_response is None:
                             break
-                        if self._upload_response_ok(upload_response):
+                        if self._upload_response_ok(upload_response, route):
                             break
-                        print(f"⚠️ Попытка {attempt}: VK вернул пустое photo — "
-                              f"повторяем загрузку с новым сервером")
+                        print(f"⚠️ Попытка {attempt}: VK не принял файл — повторяем загрузку")
                         time.sleep(3)
 
                     print("📤 UPLOAD RESPONSE:")
                     print(upload_response)
 
-                    if not self._upload_response_ok(upload_response):
+                    if route is None or not self._upload_response_ok(upload_response, route):
                         print("❌ VK так и не принял фото — пропускаем его")
                         continue
 
-                    saved = self._save_photo(save_method, upload_response)
+                    saved = self._save_photo(route, upload_response)
 
                     print("💾 SAVE RESPONSE:")
                     print(saved)
@@ -284,14 +319,14 @@ class VKUploader:
                         largest = max(photo["sizes"], key=lambda x: x.get("width", 0))
                         vk_photo_urls.append(largest["url"])
 
-                    print(f"✅ Фото сохранено: {attachment}")
+                    print(f"✅ Фото сохранено: {attachment} (маршрут: {route})")
                 except Exception as e:
                     print(f"❌ Ошибка: {e}")
                 finally:
                     if os.path.exists(temp_file):
                         os.remove(temp_file)
 
-                # ✅ Разрядка: пауза между API-вызовами разных фото
+                # ✅ Разрядка между вызовами
                 time.sleep(2)
 
         if not attachments and photo_urls:
@@ -314,7 +349,7 @@ class VKUploader:
         return {
             "post_id": post["post_id"],
             "post_url": post_url,
-            "photo_urls": vk_photo_urls,
+            "photo_urls": vk_photo_urls,   # ✅ CDN VK — именно их берёт сайт (без VPN)
             "photo_url": vk_photo_urls[0] if vk_photo_urls else None,
             "attachments": attachments,
         }
