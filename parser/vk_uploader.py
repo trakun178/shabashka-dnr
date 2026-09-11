@@ -276,6 +276,8 @@ class VKUploader:
 
                     photo = saved[0]
                     attachment = f"photo{photo['owner_id']}_{photo['id']}"
+                    if photo.get('access_key'):
+                        attachment += f"_{photo['access_key']}"
                     attachments.append(attachment)
 
                     if photo.get("sizes"):
