@@ -23,12 +23,13 @@ class VKUploader:
         self.api_url = "https://api.vk.com/method"
         self.source_name = source_name
         self.flood_blocked = False
+        self.use_messages_upload = False
+        self.last_error_code = None
         print(f"✅ VK uploader инициализирован (группа: {self.group_id})")
 
     def _api_call(self, method, params=None):
-        """Вызов метода VK с автоматическим откатом при Error 9 (Flood control):
-        ждём и повторяем; если блокировка длинная — ставим флаг flood_blocked,
-        чтобы до конца запуска не долбить VK и не продлевать блокировку."""
+        """Вызов метода VK с откатом при Error 9 (Flood control).
+        Запоминает код последней ошибки в self.last_error_code."""
         for attempt in range(1, 4):
             if params is None:
                 params = {}
@@ -38,7 +39,8 @@ class VKUploader:
             data = response.json()
             if "error" in data:
                 err = data["error"]
-                if err.get("error_code") == 9:
+                self.last_error_code = err.get("error_code")
+                if self.last_error_code == 9:
                     if attempt < 3:
                         wait = 60 * attempt
                         print(f"⏳ Flood control (Error 9) на {method}: "
@@ -47,10 +49,43 @@ class VKUploader:
                         continue
                     # Блокировка длинная — не тратим время и не продлеваем её
                     self.flood_blocked = True
-                print(f"❌ VK API Error {err['error_code']}: {err['error_msg']}")
+                print(f"❌ VK API Error {self.last_error_code}: {err['error_msg']}")
                 return None
+            self.last_error_code = None
             return data.get("response")
         return None
+
+    def _get_upload_server(self):
+        """✅ Возвращает (upload_url, save_method).
+        Если photos.getWallUploadServer недоступен групповому токену (Error 27) —
+        автоматически и навсегда переключается на messages-сервер загрузки."""
+        if not self.use_messages_upload:
+            server = self._api_call("photos.getWallUploadServer", {"group_id": self.group_id})
+            if server:
+                return server.get("upload_url"), "wall"
+            if self.last_error_code == 27:
+                print("ℹ️ getWallUploadServer недоступен с групповым токеном (Error 27) — "
+                      "переключаемся на messages-сервер загрузки")
+                self.use_messages_upload = True
+            else:
+                return None, None
+
+        server = self._api_call("photos.getMessagesUploadServer", {"group_id": self.group_id})
+        if server:
+            return server.get("upload_url"), "messages"
+        return None, None
+
+    def _save_photo(self, save_method, upload_response):
+        """Сохранение загруженного фото нужным методом."""
+        params = {
+            "server": upload_response["server"],
+            "photo": upload_response["photo"],
+            "hash": upload_response["hash"],
+        }
+        if save_method == "wall":
+            params["group_id"] = self.group_id
+            return self._api_call("photos.saveWallPhoto", params)
+        return self._api_call("photos.saveMessagesPhoto", params)
 
     def _is_image_by_magic(self, content):
         """Проверка по магическим байтам, если Content-Type отсутствует/неверный."""
@@ -69,10 +104,7 @@ class VKUploader:
 
     def _normalize_image(self, content: bytes) -> bytes:
         """Перекодирует фото в максимально чистый baseline JPEG:
-        - новый "холст" => без ICC-профилей, EXIF и маркеров исходника;
-        - RGB (убирает CMYK/альфу);
-        - сторона <= 1280 px (родной максимум VK);
-        - вес <= 5 МБ."""
+        новый "холст" (без ICC/EXIF), RGB, сторона <= 1280 px, вес <= 5 МБ."""
         if not HAS_PIL:
             print("⚠️ Pillow не установлен — отправляем как есть")
             return content
@@ -82,7 +114,6 @@ class VKUploader:
             original_mode = img.mode
             orig_w, orig_h = img.size
 
-            # Прозрачность -> на белый фон, всё остальное -> RGB
             if img.mode in ("RGBA", "LA", "P"):
                 rgb = Image.new("RGB", img.size, (255, 255, 255))
                 rgb.paste(img, mask=img.convert("RGBA").getchannel("A"))
@@ -93,7 +124,6 @@ class VKUploader:
             if max(img.size) > self.VK_MAX_SIDE:
                 img.thumbnail((self.VK_MAX_SIDE, self.VK_MAX_SIDE), Image.LANCZOS)
 
-            # ✅ Новый холст: гарантированно без icc_profile/exif/info исходника
             clean = Image.new("RGB", img.size, (255, 255, 255))
             clean.paste(img, (0, 0))
 
@@ -117,30 +147,31 @@ class VKUploader:
             return content
 
     def _upload_photo_to_server(self, temp_file):
-        """Загрузка фото на сервер VK. До 2 попыток при сетевых сбоях/не-JSON."""
+        """Загрузка фото на сервер VK. Возвращает (response, save_method).
+        До 2 попыток при сетевых сбоях/не-JSON."""
         for attempt in range(1, 3):
-            upload_server = self._api_call("photos.getWallUploadServer", {"group_id": self.group_id})
-            if not upload_server:
+            upload_url, save_method = self._get_upload_server()
+            if not upload_url:
                 print("❌ Не получен сервер загрузки")
-                return None
+                return None, None
 
             try:
                 with open(temp_file, "rb") as f:
-                    resp = requests.post(upload_server["upload_url"], files={"photo": f}, timeout=90)
+                    resp = requests.post(upload_url, files={"photo": f}, timeout=90)
             except Exception as e:
                 print(f"⚠️ Попытка {attempt}: сетевая ошибка при загрузке: {e}")
                 time.sleep(5)
                 continue
 
             try:
-                return resp.json()
+                return resp.json(), save_method
             except ValueError:
                 print(f"⚠️ Попытка {attempt}: сервер VK вернул не JSON "
                       f"(код {resp.status_code}): {resp.text[:200]!r}")
                 time.sleep(5)
 
         print("❌ Попытки загрузки не дали валидного ответа VK")
-        return None
+        return None, None
 
     @staticmethod
     def _upload_response_ok(upload_response):
@@ -201,7 +232,6 @@ class VKUploader:
                             print(f"❌ Это не изображение (Content-Type: {content_type}) — пропускаем")
                             continue
 
-                    # ✅ Чистый baseline JPEG
                     content = self._normalize_image(img.content)
 
                     if len(content) > self.VK_MAX_PHOTO_BYTES:
@@ -213,8 +243,9 @@ class VKUploader:
 
                     # До 2 попыток, если VK вернул пустое photo
                     upload_response = None
+                    save_method = None
                     for attempt in range(1, 3):
-                        upload_response = self._upload_photo_to_server(temp_file)
+                        upload_response, save_method = self._upload_photo_to_server(temp_file)
                         if upload_response is None:
                             break
                         if self._upload_response_ok(upload_response):
@@ -230,18 +261,13 @@ class VKUploader:
                         print("❌ VK так и не принял фото — пропускаем его")
                         continue
 
-                    saved = self._api_call("photos.saveWallPhoto", {
-                        "group_id": self.group_id,
-                        "server": upload_response["server"],
-                        "photo": upload_response["photo"],
-                        "hash": upload_response["hash"],
-                    })
+                    saved = self._save_photo(save_method, upload_response)
 
                     print("💾 SAVE RESPONSE:")
                     print(saved)
 
                     if not saved:
-                        print("❌ photos.saveWallPhoto вернул None")
+                        print("❌ Сохранение фото вернуло None")
                         continue
 
                     if not isinstance(saved, list) or len(saved) == 0:
