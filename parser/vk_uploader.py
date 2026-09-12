@@ -50,13 +50,10 @@ class VKUploader:
                 err = data["error"]
                 self.last_error_code = err.get("error_code")
                 if self.last_error_code == 9:
-                    if attempt < 3:
-                        wait = 60 * attempt
-                        print(f"⏳ Flood control (Error 9) на {method}: "
-                              f"ждём {wait} сек и повторяем (попытка {attempt + 1}/3)")
-                        time.sleep(wait)
-                        continue
+                    # Не продлеваем блокировку повторами: сразу стоп до конца запуска
                     self.flood_blocked = True
+                    print(f"⛔ Flood control (Error 9) на {method} — "
+                          f"VK-публикация остановлена до конца запуска")
                 print(f"❌ VK API Error {self.last_error_code}: {err['error_msg']}")
                 return None
             self.last_error_code = None
@@ -331,6 +328,10 @@ class VKUploader:
 
         if not attachments and photo_urls:
             print("⚠️ Не удалось загрузить ни одной фотографии — публикуем пост без фото")
+
+            if self.flood_blocked:
+               print("⛔ VK во флуд-контроле — пост на стену не создаём")
+            return None
 
         print("📝 Создаем запись на стене...")
         time.sleep(2)
