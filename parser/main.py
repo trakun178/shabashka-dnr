@@ -35,13 +35,15 @@ print("=" * 50)
 VK_MAX_PHOTO_BYTES = 5 * 1024 * 1024
 
 vk_uploader = None
+normalize_image = None
 if VK_TOKEN and VK_GROUP_ID:
     try:
-        from vk_uploader import VKUploader
+        from vk_uploader import VKUploader, normalize_image
         vk_uploader = VKUploader(VK_TOKEN, VK_GROUP_ID)
     except Exception as e:
         print(f"❌ Ошибка инициализации VK: {e}")
         vk_uploader = None
+        normalize_image = None
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     print("❌ SUPABASE_URL или SUPABASE_KEY не установлены!")
@@ -64,7 +66,7 @@ def mask_secret(text):
 
 def get_file_url(file_id):
     """Временная ссылка Telegram (~1 час жизни). Используется ТОЛЬКО для
-    скачивания фото при загрузке в VK и НИКОГДА не сохраняется в БД."""
+    скачивания фото и НИКОГДА не сохраняется в БД."""
     try:
         file_url = f'https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}'
         file_response = requests.get(file_url, timeout=30)
@@ -76,6 +78,48 @@ def get_file_url(file_id):
     return None
 
 
+def upload_photo_to_storage(content: bytes, message_id: int):
+    """✅ Кладёт фото в Supabase Storage (бакет ads), возвращает постоянную
+    публичную ссылку без токена бота."""
+    name = f"{message_id}.jpg"
+    try:
+        r = requests.post(
+            f"{SUPABASE_URL}/storage/v1/object/ads/{name}",
+            headers={
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "Content-Type": "image/jpeg",
+                "x-upsert": "true",
+            },
+            data=content,
+            timeout=60,
+        )
+        if r.ok:
+            print(f"   ☁️ Фото в хранилище: {name}")
+            return f"{SUPABASE_URL}/storage/v1/object/public/ads/{name}"
+        print(f"   ❌ Supabase Storage: {r.status_code} {r.text[:200]}")
+    except Exception as e:
+        print(f"   ❌ Ошибка загрузки в хранилище: {e}")
+    return None
+
+
+def download_and_store(file_id, message_id):
+    """✅ Скачивает фото из Telegram, нормализует и сохраняет в Storage.
+    Возвращает постоянную ссылку (её можно отдавать и сайту, и VK)."""
+    tg_url = get_file_url(file_id)
+    if not tg_url:
+        return None
+    try:
+        r = requests.get(tg_url, timeout=30)
+        if r.status_code != 200 or not r.content:
+            print(f"   ❌ Не удалось скачать фото из Telegram (код {r.status_code})")
+            return None
+        content = normalize_image(r.content) if normalize_image else r.content
+        return upload_photo_to_storage(content, message_id)
+    except Exception as e:
+        print(f"   ⚠️ Ошибка скачивания/обработки фото: {e}")
+        return None
+
+
 def pick_photo_size(sizes):
     """✅ Выбирает НАИБОЛЬШИЙ размер фото, проходящий под лимит VK (≤ 5 МБ)."""
     if not sizes:
@@ -84,8 +128,6 @@ def pick_photo_size(sizes):
     fit = [s for s in with_size if s['file_size'] <= VK_MAX_PHOTO_BYTES]
     if fit:
         return max(fit, key=lambda s: s.get('width', 0))
-    # Все известные размеры тяжелее 5 МБ — пробуем самый маленький из размеров
-    # без file_size (VK всё равно проверит файл при загрузке)
     without_size = [s for s in sizes if (s.get('file_size') or 0) == 0]
     if without_size:
         return min(without_size, key=lambda s: s.get('width', 0))
@@ -94,11 +136,9 @@ def pick_photo_size(sizes):
 
 def extract_media(post):
     """✅ Возвращает (photo_urls, has_media).
-
-    photo_urls — временные ссылки Telegram только для загрузки в VK
-    (в БД они больше не попадают → токен бота не светится, битых фото нет).
-    Видео и не-изображения как фото больше НЕ отправляются.
-    """
+    photo_urls — ПОСТОЯННЫЕ ссылки из Supabase Storage (не временные Telegram):
+    их безопасно хранить в БД и отдавать сайту, даже когда VK на паузе.
+    Видео и не-изображения как фото больше НЕ отправляются."""
     photo_urls = []
     has_media = False
 
@@ -106,7 +146,7 @@ def extract_media(post):
         has_media = True
         size = pick_photo_size(post['photo'])
         if size:
-            url = get_file_url(size['file_id'])
+            url = download_and_store(size['file_id'], post['message_id'])
             if url:
                 photo_urls.append(url)
         else:
@@ -117,7 +157,7 @@ def extract_media(post):
         mime = (doc.get('mime_type') or '').lower()
         fsize = doc.get('file_size') or 0
         if mime.startswith('image/') and fsize <= VK_MAX_PHOTO_BYTES:
-            url = get_file_url(doc['file_id'])
+            url = download_and_store(doc['file_id'], post['message_id'])
             if url:
                 photo_urls.append(url)
         else:
@@ -182,8 +222,10 @@ def smart_title(text, max_length=70):
         words.pop()
     return ' '.join(words) if words else text[:max_length]
 
+
 def pause_vk(hours=48):
-    """⛔ Полная тишина в VK на N часов: пишем метку в parser_state."""
+    """⛔ Полная тишина в VK на N часов: пишем метку в parser_state,
+    следующие прогоны до этого момента не делают к VK ни одного запроса."""
     until = (datetime.now(timezone(timedelta(hours=3))) + timedelta(hours=hours)).isoformat()
     r = requests.patch(
         f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1",
@@ -195,6 +237,8 @@ def pause_vk(hours=48):
 
 
 def get_channel_updates():
+    global vk_uploader
+
     print("\n" + "=" * 50)
     print("🚀 Запуск парсера Telegram канала")
     print("=" * 50)
@@ -208,7 +252,7 @@ def get_channel_updates():
     data = response.json()
     last_id = data[0]['last_message_id'] if data else 0
 
-    global vk_uploader
+    # ⛔ Проверка паузы VK (Error 9): пока метка активна — ноль запросов к VK
     vk_blocked_until = None
     if data:
         raw = data[0].get('vk_blocked_until')
@@ -290,8 +334,7 @@ def get_channel_updates():
             for post in posts if post.get('text') or post.get('caption')
         ).strip()
 
-        # ✅ Сброс для каждого альбома. Временные ссылки Telegram используются
-        #    только для загрузки в VK и НЕ сохраняются в БД.
+        # ✅ Сброс для каждого альбома. В photo_urls — постоянные ссылки Storage
         photo_urls = []
         has_media = False
         for post in posts:
@@ -340,10 +383,12 @@ def get_channel_updates():
         if combined_text or has_media:
             vk_post_url = vk_result['post_url'] if vk_result else None
 
-            # ✅ В БД сохраняются ТОЛЬКО постоянные ссылки с CDN VK (сайт быстро
-            #    грузится в РФ). Временные ссылки Telegram в базу НЕ попадают:
-            #    они живут ~1 час (битые фото) и содержат токен бота (утечка).
+            # ✅ Приоритет — CDN VK (быстро из РФ). Если VK на паузе или не принял
+            #    фото — сохраняем постоянные ссылки из Supabase Storage:
+            #    сайт остаётся С ФОТО при любом состоянии VK.
             final_photo_urls = (vk_result.get('photo_urls') or []) if vk_result else []
+            if not final_photo_urls:
+                final_photo_urls = photo_urls if photo_urls else []
             final_photo_url = final_photo_urls[0] if final_photo_urls else None
 
             new_ads.append({
@@ -360,8 +405,7 @@ def get_channel_updates():
                 'forwarded_from': forwarded_from,
                 'created_at': created_at_msk.isoformat()
             })
-            # ✅ Учитываем ID всех сообщений альбома, чтобы его части не
-            #    обработались повторно как одиночные посты
+            # ✅ Учитываем ID всех сообщений альбома
             max_id = max(max_id, *[p['message_id'] for p in posts])
             saved_count += 1
 
@@ -413,7 +457,7 @@ def get_channel_updates():
                 post_link=post_link
             )
             if vk_result is None and vk_uploader and getattr(vk_uploader, 'flood_blocked', False):
-               vk_uploader = pause_vk(48)
+                vk_uploader = pause_vk(48)
             if vk_result:
                 vk_posts_count += 1
                 print(f"  ✅ Пост в VK: {vk_result['post_url']}")
@@ -426,8 +470,10 @@ def get_channel_updates():
         if text or has_media:
             vk_post_url = vk_result['post_url'] if vk_result else None
 
-            # ✅ Только постоянные ссылки с CDN VK, никаких ссылок Telegram в БД
+            # ✅ Приоритет — CDN VK, фолбэк — Supabase Storage
             final_photo_urls = (vk_result.get('photo_urls') or []) if vk_result else []
+            if not final_photo_urls:
+                final_photo_urls = photo_urls if photo_urls else []
             final_photo_url = final_photo_urls[0] if final_photo_urls else None
 
             new_ads.append({

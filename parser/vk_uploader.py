@@ -10,20 +10,66 @@ try:
 except ImportError:
     HAS_PIL = False
 
+VK_MAX_PHOTO_BYTES = 5 * 1024 * 1024  # лимит VK на одно фото
+VK_MAX_SIDE = 1280                    # родной максимум VK для ленты
+
+
+def normalize_image(content: bytes) -> bytes:
+    """Перекодирует фото в чистый baseline JPEG: новый "холст" (без ICC/EXIF),
+    RGB, сторона <= 1280 px, вес <= 5 МБ. Используется и парсером напрямую."""
+    if not HAS_PIL:
+        print("⚠️ Pillow не установлен — отправляем как есть")
+        return content
+    try:
+        img = Image.open(io.BytesIO(content))
+        original_format = img.format
+        original_mode = img.mode
+        orig_w, orig_h = img.size
+
+        if img.mode in ("RGBA", "LA", "P"):
+            rgb = Image.new("RGB", img.size, (255, 255, 255))
+            rgb.paste(img, mask=img.convert("RGBA").getchannel("A"))
+            img = rgb
+        elif img.mode != "RGB":
+            img = img.convert("RGB")
+
+        if max(img.size) > VK_MAX_SIDE:
+            img.thumbnail((VK_MAX_SIDE, VK_MAX_SIDE), Image.LANCZOS)
+
+        clean = Image.new("RGB", img.size, (255, 255, 255))
+        clean.paste(img, (0, 0))
+
+        buf = io.BytesIO()
+        quality = 90
+        while True:
+            buf.seek(0)
+            buf.truncate()
+            clean.save(buf, format="JPEG", quality=quality,
+                       optimize=True, progressive=False)
+            if buf.tell() <= VK_MAX_PHOTO_BYTES or quality <= 50:
+                break
+            quality -= 10
+
+        print(f"🖼 Фото перекодировано: {len(content)} -> {buf.tell()} байт "
+              f"(было: {original_format}/{original_mode}, "
+              f"{orig_w}x{orig_h} -> {clean.size[0]}x{clean.size[1]})")
+        return buf.getvalue()
+    except Exception as e:
+        print(f"⚠️ Не удалось перекодировать фото ({e}) — отправляем как есть")
+        return content
+
 
 class VKUploader:
     """Публикация постов с фотографиями в группу ВКонтакте.
 
     Схема загрузки фото:
-    1) Если ключ умеет photos.getWallUploadServer — грузим через него (старая схема).
+    1) Если ключ умеет photos.getWallUploadServer — грузим через него.
     2) Если ключ отвечает Error 27 (групповые токены нового образца) —
-       автоматически переключаемся на загрузку в служебный альбом группы
-       (photos.getUploadServer + photos.save): такие фото прикрепляются
-       к посту на стене как обычные и отдают CDN-ссылку для сайта.
+       автоматически переключаемся на загрузку в служебный альбом группы.
+    При Error 9 (Flood control) — мгновенный стоп до конца запуска,
+    чтобы не продлевать блокировку повторами.
     """
 
-    VK_MAX_PHOTO_BYTES = 5 * 1024 * 1024  # лимит VK на одно фото
-    VK_MAX_SIDE = 1280                    # родной максимум VK для ленты
     ALBUM_TITLE = "Фото объявлений (сайт)"
 
     def __init__(self, token, group_id=None, source_name="Шабашка DNR, Донецк, Макеевка"):
@@ -38,27 +84,25 @@ class VKUploader:
         print(f"✅ VK uploader инициализирован (группа: {self.group_id})")
 
     def _api_call(self, method, params=None):
-        """Вызов метода VK с откатом при Error 9 (Flood control)."""
-        for attempt in range(1, 4):
-            if params is None:
-                params = {}
-            params["access_token"] = self.token
-            params["v"] = "5.131"
-            response = requests.post(f"{self.api_url}/{method}", data=params, timeout=30)
-            data = response.json()
-            if "error" in data:
-                err = data["error"]
-                self.last_error_code = err.get("error_code")
-                if self.last_error_code == 9:
-                    # Не продлеваем блокировку повторами: сразу стоп до конца запуска
-                    self.flood_blocked = True
-                    print(f"⛔ Flood control (Error 9) на {method} — "
-                          f"VK-публикация остановлена до конца запуска")
-                print(f"❌ VK API Error {self.last_error_code}: {err['error_msg']}")
-                return None
-            self.last_error_code = None
-            return data.get("response")
-        return None
+        """Вызов метода VK. При Error 9 — fail-fast: ставим флаг flood_blocked
+        и не повторяем запросы, чтобы не кормить флуд-окно."""
+        if params is None:
+            params = {}
+        params["access_token"] = self.token
+        params["v"] = "5.131"
+        response = requests.post(f"{self.api_url}/{method}", data=params, timeout=30)
+        data = response.json()
+        if "error" in data:
+            err = data["error"]
+            self.last_error_code = err.get("error_code")
+            if self.last_error_code == 9:
+                self.flood_blocked = True
+                print(f"⛔ Flood control (Error 9) на {method} — "
+                      f"VK-публикация остановлена до конца запуска")
+            print(f"❌ VK API Error {self.last_error_code}: {err['error_msg']}")
+            return None
+        self.last_error_code = None
+        return data.get("response")
 
     def _ensure_album(self):
         """Находит или создаёт служебный альбом группы для фото объявлений."""
@@ -146,52 +190,11 @@ class VKUploader:
         return False
 
     def _normalize_image(self, content: bytes) -> bytes:
-        """Перекодирует фото в чистый baseline JPEG: новый "холст" (без ICC/EXIF),
-        RGB, сторона <= 1280 px, вес <= 5 МБ."""
-        if not HAS_PIL:
-            print("⚠️ Pillow не установлен — отправляем как есть")
-            return content
-        try:
-            img = Image.open(io.BytesIO(content))
-            original_format = img.format
-            original_mode = img.mode
-            orig_w, orig_h = img.size
-
-            if img.mode in ("RGBA", "LA", "P"):
-                rgb = Image.new("RGB", img.size, (255, 255, 255))
-                rgb.paste(img, mask=img.convert("RGBA").getchannel("A"))
-                img = rgb
-            elif img.mode != "RGB":
-                img = img.convert("RGB")
-
-            if max(img.size) > self.VK_MAX_SIDE:
-                img.thumbnail((self.VK_MAX_SIDE, self.VK_MAX_SIDE), Image.LANCZOS)
-
-            clean = Image.new("RGB", img.size, (255, 255, 255))
-            clean.paste(img, (0, 0))
-
-            buf = io.BytesIO()
-            quality = 90
-            while True:
-                buf.seek(0)
-                buf.truncate()
-                clean.save(buf, format="JPEG", quality=quality,
-                           optimize=True, progressive=False)
-                if buf.tell() <= self.VK_MAX_PHOTO_BYTES or quality <= 50:
-                    break
-                quality -= 10
-
-            print(f"🖼 Фото перекодировано: {len(content)} -> {buf.tell()} байт "
-                  f"(было: {original_format}/{original_mode}, "
-                  f"{orig_w}x{orig_h} -> {clean.size[0]}x{clean.size[1]})")
-            return buf.getvalue()
-        except Exception as e:
-            print(f"⚠️ Не удалось перекодировать фото ({e}) — отправляем как есть")
-            return content
+        return normalize_image(content)
 
     def _upload_photo_to_server(self, temp_file):
-        """Скачанный и перекодированный файл укладывается на сервер VK.
-        Возвращает (response, route). До 2 попыток при сбоях."""
+        """Укладывает готовый файл на сервер VK. Возвращает (response, route).
+        До 2 попыток при сетевых сбоях/не-JSON."""
         for attempt in range(1, 3):
             upload_url, route = self._get_upload_target()
             if not upload_url:
@@ -222,7 +225,7 @@ class VKUploader:
             return None
 
         if self.flood_blocked:
-            print("⛔ VK во флуд-контроле — до конца запуска публикуем только на сайт")
+            print("⛔ VK во флуд-контроле — пост на стену не создаём")
             return None
 
         owner_id = -abs(int(self.group_id))
@@ -269,7 +272,7 @@ class VKUploader:
 
                     content = self._normalize_image(img.content)
 
-                    if len(content) > self.VK_MAX_PHOTO_BYTES:
+                    if len(content) > VK_MAX_PHOTO_BYTES:
                         print(f"❌ Фото тяжелее 5 МБ даже после перекодировки ({len(content)} байт) — пропускаем")
                         continue
 
@@ -329,8 +332,8 @@ class VKUploader:
         if not attachments and photo_urls:
             print("⚠️ Не удалось загрузить ни одной фотографии — публикуем пост без фото")
 
-            if self.flood_blocked:
-               print("⛔ VK во флуд-контроле — пост на стену не создаём")
+        if self.flood_blocked:
+            print("⛔ VK во флуд-контроле — пост на стену не создаём")
             return None
 
         print("📝 Создаем запись на стене...")
@@ -350,7 +353,7 @@ class VKUploader:
         return {
             "post_id": post["post_id"],
             "post_url": post_url,
-            "photo_urls": vk_photo_urls,   # ✅ CDN VK — именно их берёт сайт (без VPN)
+            "photo_urls": vk_photo_urls,   # CDN VK — приоритет для сайта (быстро из РФ)
             "photo_url": vk_photo_urls[0] if vk_photo_urls else None,
             "attachments": attachments,
         }
