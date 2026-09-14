@@ -182,6 +182,17 @@ def smart_title(text, max_length=70):
         words.pop()
     return ' '.join(words) if words else text[:max_length]
 
+def pause_vk(hours=48):
+    """⛔ Полная тишина в VK на N часов: пишем метку в parser_state."""
+    until = (datetime.now(timezone(timedelta(hours=3))) + timedelta(hours=hours)).isoformat()
+    r = requests.patch(
+        f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1",
+        headers=HEADERS,
+        json={'vk_blocked_until': until}
+    )
+    print(f"⛔ Error 9: полная пауза VK на {hours} ч (до {until}), статус записи: {r.status_code}")
+    return None
+
 
 def get_channel_updates():
     print("\n" + "=" * 50)
@@ -196,6 +207,19 @@ def get_channel_updates():
 
     data = response.json()
     last_id = data[0]['last_message_id'] if data else 0
+
+    global vk_uploader
+    vk_blocked_until = None
+    if data:
+        raw = data[0].get('vk_blocked_until')
+        if raw:
+            try:
+                vk_blocked_until = datetime.fromisoformat(raw)
+            except ValueError:
+                vk_blocked_until = None
+    if vk_blocked_until and vk_blocked_until > datetime.now(timezone(timedelta(hours=3))):
+        print(f"⛔ VK на паузе до {vk_blocked_until.isoformat()} — работаем только с сайтом, ноль запросов к VK")
+        vk_uploader = None
 
     ads_url = f"{SUPABASE_URL}/rest/v1/ads?order=tg_message_id.desc&limit=1"
     ads_response = requests.get(ads_url, headers=HEADERS)
@@ -301,6 +325,8 @@ def get_channel_updates():
                 forwarded_from=forwarded_from,
                 post_link=post_link
             )
+            if vk_result is None and vk_uploader and getattr(vk_uploader, 'flood_blocked', False):
+                vk_uploader = pause_vk(48)
             if vk_result:
                 vk_posts_count += 1
                 print(f"  ✅ Пост в VK: {vk_result['post_url']}")
@@ -386,6 +412,8 @@ def get_channel_updates():
                 forwarded_from=forwarded_from,
                 post_link=post_link
             )
+            if vk_result is None and vk_uploader and getattr(vk_uploader, 'flood_blocked', False):
+               vk_uploader = pause_vk(48)
             if vk_result:
                 vk_posts_count += 1
                 print(f"  ✅ Пост в VK: {vk_result['post_url']}")
