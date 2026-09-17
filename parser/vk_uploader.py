@@ -12,6 +12,11 @@ except ImportError:
 
 VK_MAX_PHOTO_BYTES = 5 * 1024 * 1024  # лимит VK на одно фото
 VK_MAX_SIDE = 1280                    # родной максимум VK для ленты
+VK_API_VERSION = "5.199"
+
+# upload_url живёт у VK ограниченное время; переиспользуем его,
+# вместо того чтобы дёргать getWallUploadServer на каждое фото
+UPLOAD_URL_TTL = 15 * 60
 
 
 def normalize_image(content: bytes) -> bytes:
@@ -59,62 +64,108 @@ def normalize_image(content: bytes) -> bytes:
         return content
 
 
+class FloodBlocked(Exception):
+    """VK ответил Error 9. Дальше в этом запуске к VK не ходим вообще."""
+
+
 class VKUploader:
     """Публикация постов с фотографиями в группу ВКонтакте.
 
-    Схема загрузки фото:
-    1) Если ключ умеет photos.getWallUploadServer — грузим через него.
-    2) Если ключ отвечает Error 27 (групповые токены нового образца) —
-       автоматически переключаемся на загрузку в служебный альбом группы.
-    При Error 9 (Flood control) — мгновенный стоп до конца запуска,
-    чтобы не продлевать блокировку повторами.
+    Правила против Error 9:
+    * upload_url берём ОДИН раз и переиспускаем для всех фото поста;
+    * ретраев не больше одного уровня — вложенные циклы запрещены;
+    * после первой девятки ни один запрос к VK больше не уходит;
+    * album_id можно передать снаружи, чтобы photos.createAlbum
+      не вызывался повторно между запусками.
     """
 
     ALBUM_TITLE = "Фото объявлений (сайт)"
+    MIN_API_INTERVAL = 0.4          # не больше ~2.5 запросов в секунду
 
-    def __init__(self, token, group_id=None, source_name="Шабашка DNR, Донецк, Макеевка"):
+    def __init__(self, token, group_id=None,
+                 source_name="Шабашка DNR, Донецк, Макеевка",
+                 album_id=None, on_album_created=None):
         self.token = token
-        self.group_id = str(group_id) if group_id else None
+        # группа могла прийти как "-227949288" — в параметрах методов
+        # VK ждёт положительный group_id
+        self.group_id = str(abs(int(group_id))) if group_id else None
         self.api_url = "https://api.vk.com/method"
         self.source_name = source_name
         self.flood_blocked = False
+        self.flood_method = None
         self.use_album_upload = False
-        self.album_id = None
+        self.album_id = album_id
+        self.on_album_created = on_album_created   # колбэк, чтобы сохранить id в БД
         self.last_error_code = None
-        print(f"✅ VK uploader инициализирован (группа: {self.group_id})")
+        self._last_call_ts = 0.0
+        self._upload_cache = None                  # (url, route, ts)
+        print(f"✅ VK uploader инициализирован (группа: {self.group_id}, альбом: {self.album_id})")
+
+    # ────────────────────────── низкий уровень ──────────────────────────
 
     def _api_call(self, method, params=None):
-        """Вызов метода VK. При Error 9 — fail-fast: ставим флаг flood_blocked
-        и не повторяем запросы, чтобы не кормить флуд-окно."""
+        """Вызов метода VK. После Error 9 запросы вообще не отправляются:
+        каждое лишнее обращение продлевает окно флуд-контроля."""
+        if self.flood_blocked:
+            print(f"⛔ Пропускаем {method}: VK уже вернул Error 9 на {self.flood_method}")
+            return None
+
+        # мягкий рейт-лимит
+        delta = time.time() - self._last_call_ts
+        if delta < self.MIN_API_INTERVAL:
+            time.sleep(self.MIN_API_INTERVAL - delta)
+
         if params is None:
             params = {}
         params["access_token"] = self.token
-        params["v"] = "5.131"
-        response = requests.post(f"{self.api_url}/{method}", data=params, timeout=30)
-        data = response.json()
+        params["v"] = VK_API_VERSION
+
+        try:
+            response = requests.post(f"{self.api_url}/{method}", data=params, timeout=30)
+            data = response.json()
+        except Exception as e:
+            print(f"⚠️ Сетевая ошибка на {method}: {e}")
+            self.last_error_code = None
+            return None
+        finally:
+            self._last_call_ts = time.time()
+
         if "error" in data:
             err = data["error"]
             self.last_error_code = err.get("error_code")
+            msg = err.get("error_msg", "")
+            print(f"❌ VK API Error {self.last_error_code} на {method}: {msg}")
             if self.last_error_code == 9:
                 self.flood_blocked = True
-                print(f"⛔ Flood control (Error 9) на {method} — "
-                      f"VK-публикация остановлена до конца запуска")
-            print(f"❌ VK API Error {self.last_error_code}: {err['error_msg']}")
+                self.flood_method = method
+                print("⛔ Flood control. Больше ни одного запроса к VK в этом запуске.")
             return None
+
         self.last_error_code = None
         return data.get("response")
 
+    # ────────────────────────── альбом ──────────────────────────
+
     def _ensure_album(self):
-        """Находит или создаёт служебный альбом группы для фото объявлений."""
+        """Ищет альбом по названию. Создаёт ТОЛЬКО если список альбомов
+        реально получен и нужного там нет — иначе плодили бы альбомы
+        при каждой ошибке getAlbums, а createAlbum лимитирован жёстко."""
         if self.album_id:
             return self.album_id
+
         albums = self._api_call("photos.getAlbums", {"group_id": self.group_id})
-        if albums is not None:
-            for item in albums.get("items", []):
-                if item.get("title") == self.ALBUM_TITLE:
-                    self.album_id = item["id"]
-                    print(f"ℹ️ Найден служебный альбом: {self.album_id}")
-                    return self.album_id
+        if albums is None:
+            print("❌ Список альбомов не получен — создавать новый не будем")
+            return None
+
+        for item in albums.get("items", []):
+            if item.get("title") == self.ALBUM_TITLE:
+                self.album_id = item["id"]
+                print(f"ℹ️ Найден служебный альбом: {self.album_id}")
+                if self.on_album_created:
+                    self.on_album_created(self.album_id)
+                return self.album_id
+
         created = self._api_call("photos.createAlbum", {
             "group_id": self.group_id,
             "title": self.ALBUM_TITLE,
@@ -123,14 +174,26 @@ class VKUploader:
         if created:
             self.album_id = created["id"]
             print(f"ℹ️ Создан служебный альбом: {self.album_id}")
+            if self.on_album_created:
+                self.on_album_created(self.album_id)
         return self.album_id
 
+    # ────────────────────────── сервер загрузки ──────────────────────────
+
     def _get_upload_target(self):
-        """Возвращает (upload_url, route), route: 'wall' или 'album'."""
+        """Возвращает (upload_url, route). Результат кэшируется на 15 минут:
+        именно частые вызовы getWallUploadServer чаще всего дают Error 9."""
+        if self._upload_cache:
+            url, route, ts = self._upload_cache
+            if time.time() - ts < UPLOAD_URL_TTL:
+                return url, route
+            self._upload_cache = None
+
         if not self.use_album_upload:
             server = self._api_call("photos.getWallUploadServer", {"group_id": self.group_id})
             if server:
-                return server.get("upload_url"), "wall"
+                self._upload_cache = (server.get("upload_url"), "wall", time.time())
+                return self._upload_cache[0], "wall"
             if self.last_error_code == 27:
                 print("ℹ️ getWallUploadServer недоступен этому ключу (Error 27) — "
                       "переключаемся на загрузку в альбом группы")
@@ -142,10 +205,12 @@ class VKUploader:
         if not album_id:
             print("❌ Не удалось получить/создать альбом для фото")
             return None, None
+
         server = self._api_call("photos.getUploadServer",
                                 {"group_id": self.group_id, "album_id": album_id})
         if server:
-            return server.get("upload_url"), "album"
+            self._upload_cache = (server.get("upload_url"), "album", time.time())
+            return self._upload_cache[0], "album"
         return None, None
 
     @staticmethod
@@ -175,55 +240,113 @@ class VKUploader:
         })
 
     def _is_image_by_magic(self, content):
-        """Проверка по магическим байтам, если Content-Type отсутствует/неверный."""
         if not content:
             return False
         header = content[:16]
-        if header.startswith(b'\xff\xd8\xff'):            # JPEG
+        if header.startswith(b'\xff\xd8\xff'):
             return True
-        if header.startswith(b'\x89PNG\r\n\x1a\n'):       # PNG
+        if header.startswith(b'\x89PNG\r\n\x1a\n'):
             return True
-        if header[:4] == b'RIFF' and b'WEBP' in header:   # WEBP
+        if header[:4] == b'RIFF' and b'WEBP' in header:
             return True
-        if header.startswith(b'GIF87a') or header.startswith(b'GIF89a'):  # GIF
+        if header.startswith(b'GIF87a') or header.startswith(b'GIF89a'):
             return True
         return False
 
     def _normalize_image(self, content: bytes) -> bytes:
         return normalize_image(content)
 
-    def _upload_photo_to_server(self, temp_file):
-        """Укладывает готовый файл на сервер VK. Возвращает (response, route).
-        До 2 попыток при сетевых сбоях/не-JSON."""
-        for attempt in range(1, 3):
-            upload_url, route = self._get_upload_target()
-            if not upload_url:
-                print("❌ Не получен сервер загрузки")
+    def _upload_one(self, temp_file):
+        """Одна попытка загрузки файла. Ретрай — уровнем выше, здесь циклов нет:
+        вложенные ретраи и были источником сорока запросов на альбом."""
+        upload_url, route = self._get_upload_target()
+        if not upload_url:
+            return None, None
+
+        try:
+            with open(temp_file, "rb") as f:
+                resp = requests.post(upload_url, files={"photo": f}, timeout=90)
+        except Exception as e:
+            print(f"⚠️ Сетевая ошибка при заливке файла: {e}")
+            # upload_url мог протухнуть — сбросим кэш, но сервер не дёргаем
+            self._upload_cache = None
+            return None, route
+
+        try:
+            return resp.json(), route
+        except ValueError:
+            print(f"⚠️ Сервер загрузки вернул не JSON (код {resp.status_code}): {resp.text[:200]!r}")
+            self._upload_cache = None
+            return None, route
+
+    def _process_photo(self, photo_url, index):
+        """Скачивает, нормализует, грузит и сохраняет одно фото.
+        Возвращает (attachment, cdn_url) или (None, None)."""
+        temp_file = f"temp_{int(time.time())}_{index}.jpg"
+        try:
+            print(f"[{index}] Скачиваем фото...")
+            img = requests.get(photo_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
+            if img.status_code != 200 or not img.content:
+                print(f"❌ Не удалось скачать изображение (код: {img.status_code})")
                 return None, None
 
-            try:
-                with open(temp_file, "rb") as f:
-                    resp = requests.post(upload_url, files={"photo": f}, timeout=90)
-            except Exception as e:
-                print(f"⚠️ Попытка {attempt}: сетевая ошибка при загрузке: {e}")
-                time.sleep(5)
-                continue
+            content_type = (img.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            print(f"   Размер: {len(img.content)} байт, Content-Type: {content_type}")
 
-            try:
-                return resp.json(), route
-            except ValueError:
-                print(f"⚠️ Попытка {attempt}: сервер VK вернул не JSON "
-                      f"(код {resp.status_code}): {resp.text[:200]!r}")
-                time.sleep(5)
+            if not content_type.startswith("image/") and not self._is_image_by_magic(img.content):
+                print(f"❌ Это не изображение (Content-Type: {content_type}) — пропускаем")
+                return None, None
 
-        print("❌ Попытки загрузки не дали валидного ответа VK")
-        return None, None
+            content = self._normalize_image(img.content)
+            if len(content) > VK_MAX_PHOTO_BYTES:
+                print(f"❌ Фото тяжелее 5 МБ после перекодировки ({len(content)} байт) — пропускаем")
+                return None, None
+
+            with open(temp_file, "wb") as f:
+                f.write(content)
+
+            # ровно две попытки, без вложенных циклов
+            upload_response, route = None, None
+            for attempt in (1, 2):
+                if self.flood_blocked:
+                    raise FloodBlocked()
+                upload_response, route = self._upload_one(temp_file)
+                if self._upload_response_ok(upload_response, route):
+                    break
+                if attempt == 1:
+                    print("⚠️ VK не принял файл — одна повторная попытка")
+                    time.sleep(3)
+
+            if not self._upload_response_ok(upload_response, route):
+                print("❌ VK так и не принял фото — пропускаем его")
+                return None, None
+
+            saved = self._save_photo(route, upload_response)
+            if not saved or not isinstance(saved, list):
+                print(f"❌ Сохранение фото вернуло: {saved}")
+                return None, None
+
+            photo = saved[0]
+            attachment = f"photo{photo['owner_id']}_{photo['id']}"
+            if photo.get("access_key"):
+                attachment += f"_{photo['access_key']}"
+
+            cdn = None
+            if photo.get("sizes"):
+                cdn = max(photo["sizes"], key=lambda x: x.get("width", 0))["url"]
+
+            print(f"✅ Фото сохранено: {attachment} (маршрут: {route})")
+            return attachment, cdn
+        finally:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+
+    # ────────────────────────── публикация ──────────────────────────
 
     def post_with_photos(self, message, photo_urls=None, forwarded_from=None, post_link=None):
         if not self.group_id:
             print("❌ Не указан group_id")
             return None
-
         if self.flood_blocked:
             print("⛔ VK во флуд-контроле — пост на стену не создаём")
             return None
@@ -233,101 +356,36 @@ class VKUploader:
         vk_photo_urls = []
 
         footer_parts = [f"📢 Источник: {self.source_name}"]
-        if forwarded_from and not forwarded_from.startswith('@'):
+        if forwarded_from and not forwarded_from.startswith("@"):
             footer_parts.append(f"👤 Переслано от: {forwarded_from}")
         if post_link:
             footer_parts.append(f"🔗 Оригинал поста: {post_link}")
 
-        full_message = message
-        if footer_parts:
-            full_message += "\n\n" + "🔸" * 10 + "\n" + "\n".join(footer_parts)
+        full_message = (message or "") + "\n\n" + "🔸" * 10 + "\n" + "\n".join(footer_parts)
 
         if photo_urls:
             print(f"📤 Загружаем {len(photo_urls)} фото...")
             for index, photo_url in enumerate(photo_urls[:10], start=1):
+                if self.flood_blocked:
+                    print("⛔ Error 9 во время загрузки — прекращаем работу с фото")
+                    return None
                 if not photo_url or "http" not in photo_url:
                     print(f"❌ Невалидный URL фото: {photo_url}")
                     continue
-
-                temp_file = f"temp_{int(time.time())}_{index}.jpg"
                 try:
-                    # ✅ СНАЧАЛА скачиваем и форматируем под VK, потом стучимся в VK
-                    print(f"[{index}] Скачиваем фото...")
-                    img = requests.get(photo_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
-                    if img.status_code != 200 or not img.content:
-                        print(f"❌ Не удалось скачать изображение (код: {img.status_code})")
-                        continue
-
-                    content_type = (img.headers.get("Content-Type") or "").split(";")[0].strip().lower()
-                    print(f"   Размер: {len(img.content)} байт, Content-Type: {content_type}")
-
-                    is_image = content_type.startswith("image/")
-                    if not is_image:
-                        if self._is_image_by_magic(img.content):
-                            is_image = True
-                            print("ℹ️ Content-Type не image/*, но файл — картинка (magic bytes OK)")
-                        else:
-                            print(f"❌ Это не изображение (Content-Type: {content_type}) — пропускаем")
-                            continue
-
-                    content = self._normalize_image(img.content)
-
-                    if len(content) > VK_MAX_PHOTO_BYTES:
-                        print(f"❌ Фото тяжелее 5 МБ даже после перекодировки ({len(content)} байт) — пропускаем")
-                        continue
-
-                    with open(temp_file, "wb") as f:
-                        f.write(content)
-
-                    upload_response, route = None, None
-                    for attempt in range(1, 3):
-                        upload_response, route = self._upload_photo_to_server(temp_file)
-                        if upload_response is None:
-                            break
-                        if self._upload_response_ok(upload_response, route):
-                            break
-                        print(f"⚠️ Попытка {attempt}: VK не принял файл — повторяем загрузку")
-                        time.sleep(3)
-
-                    print("📤 UPLOAD RESPONSE:")
-                    print(upload_response)
-
-                    if route is None or not self._upload_response_ok(upload_response, route):
-                        print("❌ VK так и не принял фото — пропускаем его")
-                        continue
-
-                    saved = self._save_photo(route, upload_response)
-
-                    print("💾 SAVE RESPONSE:")
-                    print(saved)
-
-                    if not saved:
-                        print("❌ Сохранение фото вернуло None")
-                        continue
-
-                    if not isinstance(saved, list) or len(saved) == 0:
-                        print(f"❌ Ожидался список фото, получено: {saved}")
-                        continue
-
-                    photo = saved[0]
-                    attachment = f"photo{photo['owner_id']}_{photo['id']}"
-                    if photo.get('access_key'):
-                        attachment += f"_{photo['access_key']}"
-                    attachments.append(attachment)
-
-                    if photo.get("sizes"):
-                        largest = max(photo["sizes"], key=lambda x: x.get("width", 0))
-                        vk_photo_urls.append(largest["url"])
-
-                    print(f"✅ Фото сохранено: {attachment} (маршрут: {route})")
+                    attachment, cdn = self._process_photo(photo_url, index)
+                except FloodBlocked:
+                    print("⛔ Error 9 во время загрузки — пост не создаём")
+                    return None
                 except Exception as e:
-                    print(f"❌ Ошибка: {e}")
-                finally:
-                    if os.path.exists(temp_file):
-                        os.remove(temp_file)
+                    print(f"❌ Ошибка обработки фото: {e}")
+                    continue
 
-                # ✅ Разрядка между вызовами
-                time.sleep(2)
+                if attachment:
+                    attachments.append(attachment)
+                    if cdn:
+                        vk_photo_urls.append(cdn)
+                time.sleep(1)
 
         if not attachments and photo_urls:
             print("⚠️ Не удалось загрузить ни одной фотографии — публикуем пост без фото")
@@ -337,7 +395,6 @@ class VKUploader:
             return None
 
         print("📝 Создаем запись на стене...")
-        time.sleep(2)
         post_params = {"owner_id": owner_id, "from_group": 1, "message": full_message[:4096]}
         if attachments:
             post_params["attachments"] = ",".join(attachments)
@@ -353,7 +410,7 @@ class VKUploader:
         return {
             "post_id": post["post_id"],
             "post_url": post_url,
-            "photo_urls": vk_photo_urls,   # CDN VK — приоритет для сайта (быстро из РФ)
+            "photo_urls": vk_photo_urls,
             "photo_url": vk_photo_urls[0] if vk_photo_urls else None,
             "attachments": attachments,
         }

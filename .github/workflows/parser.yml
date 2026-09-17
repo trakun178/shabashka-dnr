@@ -1,7 +1,7 @@
 name: Parser
 on:
   schedule:
-    - cron: "*/15 3-22 * * *"
+    - cron: "*/20 * * * *"
   workflow_dispatch:
 
 jobs:
