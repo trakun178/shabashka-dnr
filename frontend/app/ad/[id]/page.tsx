@@ -1,18 +1,36 @@
 import type { Metadata } from "next";
-import { getAdByTgId } from "@/lib/api"; // поправьте путь под ваш lib
+import { createClient } from "@supabase/supabase-js";
 
 const SITE = "https://shabashka.sofoniya.ru";
 const FALLBACK_IMG = `${SITE}/images/logo.webp`;
 
-type Props = { params: Promise<{ id: string }> }; // Next 15
-// Для Next 14: type Props = { params: { id: string } } и без await ниже
+type Props = { params: Promise<{ id: string }> };
+
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_KEY!,
+);
+
+export async function generateStaticParams() {
+  const { data } = await supabase
+    .from("ads")
+    .select("tg_message_id")
+    .order("tg_message_id", { ascending: false })
+    .limit(2000);
+  return (data || []).map((r) => ({ id: String(r.tg_message_id) }));
+}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { id } = await params; // Next 14: const { id } = params;
-  const ad = await getAdByTgId(id);
-  if (!ad) return { title: "Объявление не найдено — Шабашка DNR" };
+  const { id } = await params;
+  const { data: ad } = await supabase
+    .from("ads")
+    .select("*")
+    .eq("tg_message_id", id)
+    .maybeSingle();
 
-  const url = `${SITE}/ads/${ad.tg_message_id}`;
+  if (!ad) return { title: "Объявление — Шабашка DNR" };
+
+  const url = `${SITE}/ad/${ad.tg_message_id}/`;
   const image = ad.photo_url || FALLBACK_IMG;
   const description = (
     ad.description ||
@@ -43,17 +61,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function AdPage({ params }: Props) {
-  const { id } = await params; // Next 14: const { id } = params;
-  const ad = await getAdByTgId(id);
+  const { id } = await params;
+  const { data: ad } = await supabase
+    .from("ads")
+    .select("*")
+    .eq("tg_message_id", id)
+    .maybeSingle();
+
   if (!ad) return <main style={{ padding: 24 }}>Объявление не найдено.</main>;
 
-  const photos: string[] = (() => {
-    try {
-      return JSON.parse(ad.photo_urls || "[]");
-    } catch {
-      return [];
-    }
-  })();
+  let photos: string[] = [];
+  try {
+    photos = JSON.parse(ad.photo_urls || "[]");
+  } catch {
+    photos = [];
+  }
+  if (!photos.length && ad.photo_url) photos = [ad.photo_url];
 
   return (
     <main style={{ maxWidth: 800, margin: "0 auto", padding: 16 }}>
@@ -61,17 +84,15 @@ export default async function AdPage({ params }: Props) {
       <p style={{ color: "#666" }}>
         📍 {ad.city} · 🗓 {new Date(ad.created_at).toLocaleString("ru-RU")}
       </p>
-      {(photos.length ? photos : ad.photo_url ? [ad.photo_url] : []).map(
-        (src) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            key={src}
-            src={src}
-            alt={ad.title}
-            style={{ width: "100%", borderRadius: 12, marginBottom: 12 }}
-          />
-        ),
-      )}
+      {photos.map((src) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={src}
+          src={src}
+          alt={ad.title}
+          style={{ width: "100%", borderRadius: 12, marginBottom: 12 }}
+        />
+      ))}
       <p style={{ whiteSpace: "pre-wrap", fontSize: 18 }}>{ad.description}</p>
       {ad.phone && (
         <p style={{ fontSize: 22, fontWeight: 700 }}>📞 {ad.phone}</p>

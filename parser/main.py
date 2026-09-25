@@ -410,7 +410,7 @@ def get_channel_updates():
         print(f"  📸 Фото для VK: {len(photo_urls)}")
 
         post_link = f"https://t.me/{main_post.get('chat', {}).get('username', 'dnrsabbath')}/{message_id}"
-        site_link = f"{SITE_BASE}/ads/{message_id}"
+        site_link = f"{SITE_BASE}/ad/{message_id}"
         forwarded_from = main_post.get("forward_sender_name") or (
             main_post.get("forward_from_chat", {}).get("title")
             if "forward_from_chat" in main_post else None
@@ -472,7 +472,7 @@ def get_channel_updates():
         text = post.get("text") or post.get("caption", "")
         channel_username = post.get("chat", {}).get("username", "dnrsabbath")
         post_link = f"https://t.me/{channel_username}/{message_id}"
-        site_link = f"{SITE_BASE}/ads/{message_id}"
+        site_link = f"{SITE_BASE}/ad/{message_id}"
 
         forwarded_from = None
         if "forward_from" in post:
