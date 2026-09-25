@@ -1,8 +1,12 @@
 name: Parser
 on:
   schedule:
-    - cron: "*/20 * * * *"
+    - cron: "*/15 0-19 * * *" # каждые 15 минут, 03:00–22:45 МСК
   workflow_dispatch:
+
+concurrency:
+  group: parser
+  cancel-in-progress: false
 
 jobs:
   parse:

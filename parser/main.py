@@ -33,7 +33,11 @@ print("=" * 50)
 
 SITE_BASE = "https://shabashka.sofoniya.ru"
 VK_MAX_PHOTO_BYTES = 5 * 1024 * 1024
-VK_DAILY_POST_LIMIT = 20  # потолок постов в сутки (на тёплый старт можно снизить до 10)
+VK_POST_DELAY = 60  # пауза между VK-постами внутри одного запуска
+
+# 📯 Режим работы: публикуем ВСЕ посты запуска в VK, без дневного потолка.
+# Защита от Error 9: задержка между постами, fail-fast по девятке,
+# прогрессивная пауза 1/6/24 ч, кэш upload_url в аплоадере.
 
 vk_uploader = None
 
@@ -137,14 +141,6 @@ def reset_flood_streak():
         )
     except Exception:
         pass
-
-
-def vk_quota_left(state_row):
-    """Сколько постов ещё можно опубликовать сегодня."""
-    today = datetime.now(timezone(timedelta(hours=3))).date().isoformat()
-    if (state_row or {}).get("vk_posts_date") != today:
-        return VK_DAILY_POST_LIMIT
-    return max(0, VK_DAILY_POST_LIMIT - int(state_row.get("vk_posts_today") or 0))
 
 
 def get_file_url(file_id):
@@ -305,6 +301,7 @@ def get_channel_updates():
 
     print("\n" + "=" * 50)
     print("🚀 Запуск парсера Telegram канала")
+    print("📯 Режим: публикуем ВСЕ посты запуска в VK (без дневного потолка)")
     print("=" * 50)
 
     url = f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1"
@@ -344,11 +341,6 @@ def get_channel_updates():
             real_last_id = ads_data[0]["tg_message_id"]
     if real_last_id > last_id:
         last_id = real_last_id
-
-    # ⏸ Дневной лимит: если исчерпан, отключаем VK-публикацию на сегодня
-    if vk_uploader and vk_quota_left(state_row) <= 0:
-        print(f"⏸ Дневной лимит {VK_DAILY_POST_LIMIT} постов в VK исчерпан — только сайт")
-        vk_uploader = None
 
     print(f"✅ Будем искать сообщения > {last_id}")
 
@@ -393,13 +385,10 @@ def get_channel_updates():
     max_id = last_id
     saved_count = 0
     vk_posts_count = 0
-    vk_posts_this_run = 0
 
     # ──────────── альбомы ────────────
-    for idx, media_group_id in enumerate(groups.keys()):
-        # ✅ Один VK-пост за запуск: остальные идут только на сайт
-        local_vk_uploader = vk_uploader if (vk_uploader and vk_posts_this_run == 0) else None
-
+    group_keys = list(groups.keys())
+    for idx, media_group_id in enumerate(group_keys):
         posts = groups[media_group_id]
         main_post = posts[0]
         message_id = main_post["message_id"]
@@ -428,22 +417,27 @@ def get_channel_updates():
         )
 
         vk_result = None
-        if local_vk_uploader and (combined_text or has_media):
+        if vk_uploader and (combined_text or has_media):
             print("  📤 Публикуем пост в VK...")
-            vk_result = local_vk_uploader.post_with_photos(
+            vk_result = vk_uploader.post_with_photos(
                 message=combined_text[:4096],
                 photo_urls=photo_urls if photo_urls else None,
                 forwarded_from=forwarded_from,
                 post_link=post_link,
                 site_link=site_link,
             )
-            if vk_result is None and getattr(local_vk_uploader, "flood_blocked", False):
+            if vk_result is None and getattr(vk_uploader, "flood_blocked", False):
                 vk_uploader = pause_vk_progressive(state_row)
             elif vk_result:
                 vk_posts_count += 1
-                vk_posts_this_run += 1
                 reset_flood_streak()
                 print(f"  ✅ Пост в VK: {vk_result['post_url']}")
+
+                # ✅ Умная задержка: только если это не последний пост запуска
+                is_last_item = (idx == len(group_keys) - 1) and (len(single_messages) == 0)
+                if not is_last_item:
+                    print(f"  ⏱️ Ожидание {VK_POST_DELAY} секунд перед следующим постом...")
+                    time.sleep(VK_POST_DELAY)
 
         if combined_text or has_media:
             vk_post_url = vk_result["post_url"] if vk_result else None
@@ -471,8 +465,6 @@ def get_channel_updates():
 
     # ──────────── одиночные сообщения ────────────
     for idx, post in enumerate(single_messages):
-        local_vk_uploader = vk_uploader if (vk_uploader and vk_posts_this_run == 0) else None
-
         message_id = post["message_id"]
         tg_date = datetime.fromtimestamp(post["date"], tz=timezone.utc)
         created_at_msk = tg_date.astimezone(timezone(timedelta(hours=3)))
@@ -500,22 +492,25 @@ def get_channel_updates():
         print(f"   📸 Фото для VK: {len(photo_urls)}")
 
         vk_result = None
-        if local_vk_uploader and (text or has_media):
+        if vk_uploader and (text or has_media):
             print("   📤 Публикуем пост в VK...")
-            vk_result = local_vk_uploader.post_with_photos(
+            vk_result = vk_uploader.post_with_photos(
                 message=text[:4096],
                 photo_urls=photo_urls if photo_urls else None,
                 forwarded_from=forwarded_from,
                 post_link=post_link,
                 site_link=site_link,
             )
-            if vk_result is None and getattr(local_vk_uploader, "flood_blocked", False):
+            if vk_result is None and getattr(vk_uploader, "flood_blocked", False):
                 vk_uploader = pause_vk_progressive(state_row)
             elif vk_result:
                 vk_posts_count += 1
-                vk_posts_this_run += 1
                 reset_flood_streak()
                 print(f"  ✅ Пост в VK: {vk_result['post_url']}")
+
+                if idx < len(single_messages) - 1:
+                    print(f"  ⏱️ Ожидание {VK_POST_DELAY} секунд перед следующим постом...")
+                    time.sleep(VK_POST_DELAY)
 
         if text or has_media:
             vk_post_url = vk_result["post_url"] if vk_result else None
@@ -554,19 +549,11 @@ def get_channel_updates():
         if response.status_code in [200, 201]:
             print("✅ Объявления успешно сохранены в базу!")
 
-            today = datetime.now(timezone(timedelta(hours=3))).date().isoformat()
-            new_vk_used = int(state_row.get("vk_posts_today") or 0) + vk_posts_count
-            if state_row.get("vk_posts_date") != today:
-                new_vk_used = vk_posts_count
-
-            state_payload = {
+            url_state = f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1"
+            state_response = requests.patch(url_state, headers=HEADERS, json={
                 "last_message_id": max_id,
                 "updated_at": datetime.now(timezone(timedelta(hours=3))).isoformat(),
-                "vk_posts_today": new_vk_used,
-                "vk_posts_date": today,
-            }
-            url_state = f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1"
-            state_response = requests.patch(url_state, headers=HEADERS, json=state_payload)
+            })
 
             if state_response.status_code in (200, 204):
                 print(f"✅ Готово! last_message_id: {last_id} → {max_id}")
