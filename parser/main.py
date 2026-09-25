@@ -31,11 +31,16 @@ print(f"  VK_TOKEN: {'✅' if VK_TOKEN else '❌'}")
 print(f"  VK_GROUP_ID: {'✅' if VK_GROUP_ID else '❌'}")
 print("=" * 50)
 
+SITE_BASE = "https://shabashka.sofoniya.ru"
 VK_MAX_PHOTO_BYTES = 5 * 1024 * 1024
-VK_DAILY_POST_LIMIT = 20  # потолок постов в сутки
+VK_DAILY_POST_LIMIT = 20  # потолок постов в сутки (на тёплый старт можно снизить до 10)
 
 vk_uploader = None
-VK_ALBUM_ID = None
+
+try:
+    from vk_uploader import normalize_image
+except Exception:
+    normalize_image = None
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     print("❌ SUPABASE_URL или SUPABASE_KEY не установлены!")
@@ -50,6 +55,7 @@ HEADERS = {
 
 
 def mask_secret(text):
+    """✅ Прячем токен бота из логов."""
     if text and BOT_TOKEN:
         return str(text).replace(BOT_TOKEN, '***')
     return text
@@ -72,6 +78,7 @@ def parse_ts(raw):
 
 
 def save_album_id(album_id):
+    """Колбэк аплоадера: запоминаем служебный альбом навсегда."""
     try:
         requests.patch(
             f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1",
@@ -85,6 +92,7 @@ def save_album_id(album_id):
 
 
 def pause_vk(hours):
+    """⛔ Пауза VK на N часов с проверкой, что метка РЕАЛЬНО записалась."""
     until = (datetime.now(timezone(timedelta(hours=3))) + timedelta(hours=hours)).isoformat()
     try:
         r = requests.patch(
@@ -94,10 +102,8 @@ def pause_vk(hours):
             timeout=30,
         )
         if r.status_code not in (200, 204):
-            print("🚨 ПАУЗА НЕ СОХРАНЕНА! "
-                  f"Supabase: {r.status_code} {r.text[:200]}")
-            print("🚨 Добавьте колонку: "
-                  "alter table parser_state add column if not exists vk_blocked_until timestamptz;")
+            print(f"🚨 ПАУЗА НЕ СОХРАНЕНА! Supabase: {r.status_code} {r.text[:200]}")
+            print("🚨 Добавьте колонку: alter table parser_state add column if not exists vk_blocked_until timestamptz;")
         else:
             print(f"⛔ Error 9: пауза VK на {hours} ч, до {until}")
     except Exception as e:
@@ -106,6 +112,7 @@ def pause_vk(hours):
 
 
 def pause_vk_progressive(state_row):
+    """1-я девятка — 1 ч, 2-я подряд — 6 ч, 3-я и дальше — 24 ч."""
     streak = int((state_row or {}).get("vk_flood_streak") or 0) + 1
     hours = {1: 1, 2: 6}.get(streak, 24)
     try:
@@ -120,26 +127,6 @@ def pause_vk_progressive(state_row):
     return pause_vk(hours)
 
 
-def vk_quota_left(state_row):
-    today = datetime.now(timezone(timedelta(hours=3))).date().isoformat()
-    if (state_row or {}).get("vk_posts_date") != today:
-        return VK_DAILY_POST_LIMIT
-    return max(0, VK_DAILY_POST_LIMIT - int(state_row.get("vk_posts_today") or 0))
-
-
-def vk_quota_bump(used):
-    today = datetime.now(timezone(timedelta(hours=3))).date().isoformat()
-    try:
-        requests.patch(
-            f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1",
-            headers=HEADERS,
-            json={"vk_posts_today": used, "vk_posts_date": today},
-            timeout=30,
-        )
-    except Exception:
-        pass
-
-
 def reset_flood_streak():
     try:
         requests.patch(
@@ -152,7 +139,16 @@ def reset_flood_streak():
         pass
 
 
+def vk_quota_left(state_row):
+    """Сколько постов ещё можно опубликовать сегодня."""
+    today = datetime.now(timezone(timedelta(hours=3))).date().isoformat()
+    if (state_row or {}).get("vk_posts_date") != today:
+        return VK_DAILY_POST_LIMIT
+    return max(0, VK_DAILY_POST_LIMIT - int(state_row.get("vk_posts_today") or 0))
+
+
 def get_file_url(file_id):
+    """Временная ссылка Telegram (~1 час). ТОЛЬКО для скачивания, не в БД."""
     try:
         file_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}"
         file_response = requests.get(file_url, timeout=30)
@@ -165,6 +161,7 @@ def get_file_url(file_id):
 
 
 def upload_photo_to_storage(content: bytes, message_id: int):
+    """✅ Кладёт фото в Supabase Storage (бакет ads), возвращает постоянную ссылку."""
     name = f"{message_id}.jpg"
     try:
         r = requests.post(
@@ -187,6 +184,7 @@ def upload_photo_to_storage(content: bytes, message_id: int):
 
 
 def download_and_store(file_id, message_id):
+    """Скачивает фото из Telegram, нормализует и сохраняет в Storage."""
     tg_url = get_file_url(file_id)
     if not tg_url:
         return None
@@ -195,8 +193,7 @@ def download_and_store(file_id, message_id):
         if r.status_code != 200 or not r.content:
             print(f"   ❌ Не удалось скачать фото из Telegram (код {r.status_code})")
             return None
-        from vk_uploader import normalize_image
-        content = normalize_image(r.content)
+        content = normalize_image(r.content) if normalize_image else r.content
         return upload_photo_to_storage(content, message_id)
     except Exception as e:
         print(f"   ⚠️ Ошибка скачивания/обработки фото: {e}")
@@ -204,6 +201,7 @@ def download_and_store(file_id, message_id):
 
 
 def pick_photo_size(sizes):
+    """✅ Наибольший размер фото, проходящий под лимит VK (≤ 5 МБ)."""
     if not sizes:
         return None
     with_size = [s for s in sizes if (s.get("file_size") or 0) > 0]
@@ -217,6 +215,7 @@ def pick_photo_size(sizes):
 
 
 def extract_media(post):
+    """Возвращает (photo_urls, has_media). photo_urls — постоянные ссылки Storage."""
     photo_urls = []
     has_media = False
 
@@ -302,7 +301,7 @@ def smart_title(text, max_length=70):
 
 
 def get_channel_updates():
-    global vk_uploader, VK_ALBUM_ID
+    global vk_uploader
 
     print("\n" + "=" * 50)
     print("🚀 Запуск парсера Telegram канала")
@@ -317,9 +316,9 @@ def get_channel_updates():
     data = response.json()
     state_row = data[0] if data else {}
     last_id = state_row.get("last_message_id", 0) or 0
-    VK_ALBUM_ID = state_row.get("vk_album_id")
+    vk_album_id = state_row.get("vk_album_id")
 
-    # ⛔ Проверка паузы VK (прогрессивная)
+    # ⛔ Проверка паузы VK: пока метка активна — ноль запросов к VK
     vk_blocked_until = parse_ts(state_row.get("vk_blocked_until"))
     if vk_blocked_until and vk_blocked_until > datetime.now(timezone(timedelta(hours=3))):
         print(f"⛔ VK на паузе до {vk_blocked_until.isoformat()} — ноль запросов к VK")
@@ -329,7 +328,7 @@ def get_channel_updates():
                 from vk_uploader import VKUploader
                 vk_uploader = VKUploader(
                     VK_TOKEN, VK_GROUP_ID,
-                    album_id=VK_ALBUM_ID,
+                    album_id=vk_album_id,
                     on_album_created=save_album_id,
                 )
             except Exception as e:
@@ -399,9 +398,7 @@ def get_channel_updates():
     # ──────────── альбомы ────────────
     for idx, media_group_id in enumerate(groups.keys()):
         # ✅ Один VK-пост за запуск: остальные идут только на сайт
-        local_vk_uploader = None
-        if vk_uploader and vk_posts_this_run == 0:
-            local_vk_uploader = vk_uploader
+        local_vk_uploader = vk_uploader if (vk_uploader and vk_posts_this_run == 0) else None
 
         posts = groups[media_group_id]
         main_post = posts[0]
@@ -424,6 +421,7 @@ def get_channel_updates():
         print(f"  📸 Фото для VK: {len(photo_urls)}")
 
         post_link = f"https://t.me/{main_post.get('chat', {}).get('username', 'dnrsabbath')}/{message_id}"
+        site_link = f"{SITE_BASE}/ads/{message_id}"
         forwarded_from = main_post.get("forward_sender_name") or (
             main_post.get("forward_from_chat", {}).get("title")
             if "forward_from_chat" in main_post else None
@@ -437,6 +435,7 @@ def get_channel_updates():
                 photo_urls=photo_urls if photo_urls else None,
                 forwarded_from=forwarded_from,
                 post_link=post_link,
+                site_link=site_link,
             )
             if vk_result is None and getattr(local_vk_uploader, "flood_blocked", False):
                 vk_uploader = pause_vk_progressive(state_row)
@@ -472,9 +471,7 @@ def get_channel_updates():
 
     # ──────────── одиночные сообщения ────────────
     for idx, post in enumerate(single_messages):
-        local_vk_uploader = None
-        if vk_uploader and vk_posts_this_run == 0:
-            local_vk_uploader = vk_uploader
+        local_vk_uploader = vk_uploader if (vk_uploader and vk_posts_this_run == 0) else None
 
         message_id = post["message_id"]
         tg_date = datetime.fromtimestamp(post["date"], tz=timezone.utc)
@@ -483,6 +480,7 @@ def get_channel_updates():
         text = post.get("text") or post.get("caption", "")
         channel_username = post.get("chat", {}).get("username", "dnrsabbath")
         post_link = f"https://t.me/{channel_username}/{message_id}"
+        site_link = f"{SITE_BASE}/ads/{message_id}"
 
         forwarded_from = None
         if "forward_from" in post:
@@ -509,6 +507,7 @@ def get_channel_updates():
                 photo_urls=photo_urls if photo_urls else None,
                 forwarded_from=forwarded_from,
                 post_link=post_link,
+                site_link=site_link,
             )
             if vk_result is None and getattr(local_vk_uploader, "flood_blocked", False):
                 vk_uploader = pause_vk_progressive(state_row)
@@ -544,7 +543,7 @@ def get_channel_updates():
 
     print(f"\n📊 Итог: {saved_count} объявлений, {vk_posts_count} постов в VK")
 
-    # Сохраняем в Supabase
+    # ──────────── сохранение в Supabase ────────────
     if new_ads:
         print(f"\n💾 Сохраняем {len(new_ads)} объявлений...")
         url = f"{SUPABASE_URL}/rest/v1/ads"
@@ -555,9 +554,8 @@ def get_channel_updates():
         if response.status_code in [200, 201]:
             print("✅ Объявления успешно сохранены в базу!")
 
-            # Считаем новые VK-посты
-            new_vk_used = int(state_row.get("vk_posts_today") or 0) + vk_posts_count
             today = datetime.now(timezone(timedelta(hours=3))).date().isoformat()
+            new_vk_used = int(state_row.get("vk_posts_today") or 0) + vk_posts_count
             if state_row.get("vk_posts_date") != today:
                 new_vk_used = vk_posts_count
 
@@ -577,9 +575,10 @@ def get_channel_updates():
         else:
             print(f"❌ КРИТИЧЕСКАЯ ОШИБКА: Объявления НЕ сохранены (Код: {response.status_code})")
             print(f"Ответ Supabase: {response.text[:300]}")
+            print("⚠️ last_message_id НЕ обновлен! При следующем запуске парсер попробует снова.")
     else:
         print("\nℹ️ Новых объявлений для сохранения нет")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     get_channel_updates()

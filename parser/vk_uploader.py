@@ -72,11 +72,12 @@ class VKUploader:
     """Публикация постов с фотографиями в группу ВКонтакте.
 
     Правила против Error 9:
-    * upload_url берём ОДИН раз и переиспускаем для всех фото поста;
+    * upload_url берём ОДИН раз и переиспользуем для всех фото поста;
     * ретраев не больше одного уровня — вложенные циклы запрещены;
     * после первой девятки ни один запрос к VK больше не уходит;
-    * album_id можно передать снаружи, чтобы photos.createAlbum
-      не вызывался повторно между запусками.
+    * album_id передаётся снаружи и хранится в БД — createAlbum не повторяется;
+    * если ключу недоступны ни стена, ни альбом (Error 27) — не долбим
+      getAlbums/createAlbum на каждом фото, пост уходит текстом со ссылкой.
     """
 
     ALBUM_TITLE = "Фото объявлений (сайт)"
@@ -86,7 +87,7 @@ class VKUploader:
                  source_name="Шабашка DNR, Донецк, Макеевка",
                  album_id=None, on_album_created=None):
         self.token = token
-        # группа могла прийти как "-227949288" — в параметрах методов
+        # группа могла прийти как "-203412616" — в параметрах методов
         # VK ждёт положительный group_id
         self.group_id = str(abs(int(group_id))) if group_id else None
         self.api_url = "https://api.vk.com/method"
@@ -94,6 +95,7 @@ class VKUploader:
         self.flood_blocked = False
         self.flood_method = None
         self.use_album_upload = False
+        self.album_unavailable = False
         self.album_id = album_id
         self.on_album_created = on_album_created   # колбэк, чтобы сохранить id в БД
         self.last_error_code = None
@@ -119,7 +121,6 @@ class VKUploader:
             params = {}
         params["access_token"] = self.token
         params["v"] = VK_API_VERSION
-
         try:
             response = requests.post(f"{self.api_url}/{method}", data=params, timeout=30)
             data = response.json()
@@ -148,14 +149,17 @@ class VKUploader:
 
     def _ensure_album(self):
         """Ищет альбом по названию. Создаёт ТОЛЬКО если список альбомов
-        реально получен и нужного там нет — иначе плодили бы альбомы
-        при каждой ошибке getAlbums, а createAlbum лимитирован жёстко."""
+        реально получен и нужного там нет. При ошибках помечает маршрут
+        недоступным, чтобы не долбить лимитированный createAlbum."""
         if self.album_id:
             return self.album_id
+        if self.album_unavailable:
+            return None
 
         albums = self._api_call("photos.getAlbums", {"group_id": self.group_id})
         if albums is None:
-            print("❌ Список альбомов не получен — создавать новый не будем")
+            print("❌ Список альбомов не получен — маршрут альбома помечен недоступным")
+            self.album_unavailable = True
             return None
 
         for item in albums.get("items", []):
@@ -176,7 +180,10 @@ class VKUploader:
             print(f"ℹ️ Создан служебный альбом: {self.album_id}")
             if self.on_album_created:
                 self.on_album_created(self.album_id)
-        return self.album_id
+            return self.album_id
+
+        self.album_unavailable = True
+        return None
 
     # ────────────────────────── сервер загрузки ──────────────────────────
 
@@ -196,14 +203,18 @@ class VKUploader:
                 return self._upload_cache[0], "wall"
             if self.last_error_code == 27:
                 print("ℹ️ getWallUploadServer недоступен этому ключу (Error 27) — "
-                      "переключаемся на загрузку в альбом группы")
+                      "пробуем загрузку в альбом группы")
                 self.use_album_upload = True
             else:
                 return None, None
 
+        if self.album_unavailable:
+            return None, None
+
         album_id = self._ensure_album()
         if not album_id:
-            print("❌ Не удалось получить/создать альбом для фото")
+            print("⚠️ Альбом недоступен этому ключу — фото пропускаются, "
+                  "пост уйдёт текстом со ссылкой на сайт")
             return None, None
 
         server = self._api_call("photos.getUploadServer",
@@ -243,13 +254,13 @@ class VKUploader:
         if not content:
             return False
         header = content[:16]
-        if header.startswith(b'\xff\xd8\xff'):
+        if header.startswith(b'\xff\xd8\xff'):            # JPEG
             return True
-        if header.startswith(b'\x89PNG\r\n\x1a\n'):
+        if header.startswith(b'\x89PNG\r\n\x1a\n'):       # PNG
             return True
-        if header[:4] == b'RIFF' and b'WEBP' in header:
+        if header[:4] == b'RIFF' and b'WEBP' in header:   # WEBP
             return True
-        if header.startswith(b'GIF87a') or header.startswith(b'GIF89a'):
+        if header.startswith(b'GIF87a') or header.startswith(b'GIF89a'):  # GIF
             return True
         return False
 
@@ -258,11 +269,10 @@ class VKUploader:
 
     def _upload_one(self, temp_file):
         """Одна попытка загрузки файла. Ретрай — уровнем выше, здесь циклов нет:
-        вложенные ретраи и были источником сорока запросов на альбом."""
+        вложенные ретраи и были источником десятков запросов на альбом."""
         upload_url, route = self._get_upload_target()
         if not upload_url:
             return None, None
-
         try:
             with open(temp_file, "rb") as f:
                 resp = requests.post(upload_url, files={"photo": f}, timeout=90)
@@ -271,7 +281,6 @@ class VKUploader:
             # upload_url мог протухнуть — сбросим кэш, но сервер не дёргаем
             self._upload_cache = None
             return None, route
-
         try:
             return resp.json(), route
         except ValueError:
@@ -343,10 +352,12 @@ class VKUploader:
 
     # ────────────────────────── публикация ──────────────────────────
 
-    def post_with_photos(self, message, photo_urls=None, forwarded_from=None, post_link=None):
+    def post_with_photos(self, message, photo_urls=None, forwarded_from=None,
+                         post_link=None, site_link=None):
         if not self.group_id:
             print("❌ Не указан group_id")
             return None
+
         if self.flood_blocked:
             print("⛔ VK во флуд-контроле — пост на стену не создаём")
             return None
@@ -355,7 +366,11 @@ class VKUploader:
         attachments = []
         vk_photo_urls = []
 
+        # ✅ Ссылка на сайт идёт ПЕРВОЙ ссылкой в посте: VK построит превью
+        #    с фото и описанием из OG-тегов страницы объявления
         footer_parts = [f"📢 Источник: {self.source_name}"]
+        if site_link:
+            footer_parts.append(f"🌐 Объявление с фото: {site_link}")
         if forwarded_from and not forwarded_from.startswith("@"):
             footer_parts.append(f"👤 Переслано от: {forwarded_from}")
         if post_link:
@@ -380,7 +395,6 @@ class VKUploader:
                 except Exception as e:
                     print(f"❌ Ошибка обработки фото: {e}")
                     continue
-
                 if attachment:
                     attachments.append(attachment)
                     if cdn:
