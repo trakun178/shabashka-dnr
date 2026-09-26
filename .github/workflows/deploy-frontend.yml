@@ -21,7 +21,8 @@ jobs:
 
       - name: Install
         working-directory: frontend
-        run: npm ci
+        run: npm install --no-audit --no-fund
+        run: npm install --no-audit --no-fund
 
       - name: Build static export
         working-directory: frontend
