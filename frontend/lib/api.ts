@@ -25,9 +25,21 @@ export async function getAllAdIds() {
   return (await res.json()) as { tg_message_id: number }[];
 }
 
-export async function getAds(limit = 200) {
+export async function getAllAds(limit = 1000): Promise<any[]> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/ads?order=created_at.desc&limit=${limit}`,
+    `${SUPABASE_URL}/rest/v1/ads?order=tg_message_id.desc&limit=${limit}`,
+    { headers },
+  );
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function getAdsByCategory(
+  category: string,
+  limit = 200,
+): Promise<any[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/ads?category=eq.${encodeURIComponent(category)}&order=tg_message_id.desc&limit=${limit}`,
     { headers },
   );
   if (!res.ok) return [];

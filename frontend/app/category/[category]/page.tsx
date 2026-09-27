@@ -1,37 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-
-const SITE = "https://shabashka.sofoniya.ru";
-
-const CATEGORIES = [
-  "ремонт",
-  "сантехника",
-  "электрика",
-  "строительство",
-  "грузчики",
-  "уборка",
-  "окна",
-  "другое",
-];
+import { getAdsByCategory } from "@/lib/api";
+import { CATEGORIES, SITE } from "@/lib/site";
+import { Header, Footer, AdCard, chip } from "@/components/ui";
 
 type Props = { params: Promise<{ category: string }> };
 
 export function generateStaticParams() {
   return CATEGORIES.map((category) => ({ category }));
-}
-
-async function getAds(category: string): Promise<any[]> {
-  const url =
-    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/ads` +
-    `?category=eq.${encodeURIComponent(category)}&order=created_at.desc&limit=100`;
-  const res = await fetch(url, {
-    headers: {
-      apikey: process.env.NEXT_PUBLIC_SUPABASE_KEY!,
-      Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_KEY!}`,
-    },
-  });
-  if (!res.ok) return [];
-  return res.json();
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -47,47 +23,38 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CategoryPage({ params }: Props) {
   const { category } = await params;
-  const ads = await getAds(category);
-
+  const ads = await getAdsByCategory(category);
   return (
-    <main style={{ maxWidth: 800, margin: "0 auto", padding: 16 }}>
-      <h1>Объявления: {category}</h1>
-      {ads.length === 0 && <p>В этой категории пока пусто.</p>}
-      {ads.map((ad: any) => (
-        <article
-          key={ad.tg_message_id}
-          style={{ borderBottom: "1px solid #333", padding: "12px 0" }}
+    <>
+      <Header />
+      <main
+        style={{ maxWidth: 1080, margin: "0 auto", padding: "26px 16px 20px" }}
+      >
+        <h1 style={{ fontSize: 28, fontWeight: 900 }}>
+          Категория: <span style={{ color: "#67e8f9" }}>{category}</span>
+        </h1>
+        {ads.length === 0 && (
+          <p style={{ color: "#8b98ad" }}>В этой категории пока пусто.</p>
+        )}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+            gap: 16,
+            marginTop: 16,
+          }}
         >
-          <h2 style={{ fontSize: 18 }}>
-            <Link
-              href={`/ad/${ad.tg_message_id}/`}
-              style={{ color: "inherit" }}
-            >
-              {ad.title}
-            </Link>
-          </h2>
-          <p style={{ color: "#999", margin: "4px 0" }}>
-            📍 {ad.city}
-            {ad.phone ? ` · 📞 ${ad.phone}` : ""}
-          </p>
-          {ad.photo_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={ad.photo_url}
-              alt={ad.title}
-              style={{
-                width: "100%",
-                maxHeight: 300,
-                objectFit: "cover",
-                borderRadius: 12,
-              }}
-            />
-          )}
-        </article>
-      ))}
-      <p style={{ marginTop: 16 }}>
-        <Link href="/">← Все объявления</Link>
-      </p>
-    </main>
+          {ads.map((ad) => (
+            <AdCard key={ad.tg_message_id} ad={ad} />
+          ))}
+        </div>
+        <p style={{ marginTop: 22 }}>
+          <Link className="chip" style={chip} href="/">
+            ← Все объявления
+          </Link>
+        </p>
+      </main>
+      <Footer />
+    </>
   );
 }
