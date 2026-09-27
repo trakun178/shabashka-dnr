@@ -85,7 +85,10 @@ export function Header() {
           alt="Шабашка DNR"
           width={42}
           height={42}
-          style={{ borderRadius: 10, boxShadow: "0 0 16px rgba(0,229,255,.4)" }}
+          style={{
+            borderRadius: "50%",
+            boxShadow: "0 0 16px rgba(0,229,255,.4)",
+          }}
         />
         <div style={{ flex: 1, minWidth: 0 }}>
           <Link
@@ -132,7 +135,7 @@ export function Hero({ total }: { total: number }) {
         style={{
           width: 148,
           height: 148,
-          borderRadius: 34,
+          borderRadius: "50%",
           display: "block",
           margin: "0 auto 18px",
           border: "1px solid #22304a",
