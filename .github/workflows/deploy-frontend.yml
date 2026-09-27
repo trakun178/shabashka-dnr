@@ -5,23 +5,25 @@ on:
     branches: [main]
     paths:
       - "frontend/**"
+      - ".github/workflows/deploy-frontend.yml"
   schedule:
-    - cron: "*/30 * * * *" # каждые 30 минут — подтягиваем новые объявления
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 20
 
       - name: Install
         working-directory: frontend
-        run: npm install --no-audit --no-fund
         run: npm install --no-audit --no-fund
 
       - name: Build static export
@@ -29,6 +31,8 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: npm run build
 
       - name: Deploy to GitHub Pages
