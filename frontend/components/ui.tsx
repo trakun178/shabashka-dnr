@@ -116,86 +116,68 @@ export function fmt(n: number | null | undefined): string {
   return String(n);
 }
 
-export function IconTg({ size = 16 }: { size?: number }) {
+// ─────────── брендовые иконки: круги одного размера, лого заполняет круг ───────────
+export function BrandIcon({
+  src,
+  alt,
+  size = 16,
+}: {
+  src: string;
+  alt: string;
+  size?: number;
+}) {
+  // eslint-disable-next-line @next/next/no-img-element
   return (
-    <svg
+    <img
+      src={src}
+      alt={alt}
       width={size}
       height={size}
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      aria-hidden="true"
-    >
-      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
-    </svg>
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        display: "block",
+      }}
+    />
   );
 }
 
+export function IconTg({ size = 16 }: { size?: number }) {
+  return <BrandIcon src="/icons/tg.svg" alt="Telegram" size={size} />;
+}
 export function IconVk({ size = 16 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-      <rect width="24" height="24" rx="6" fill="#0077FF" />
-      <text
-        x="12"
-        y="16.5"
-        textAnchor="middle"
-        fontSize="10"
-        fontWeight="800"
-        fill="#fff"
-        fontFamily="system-ui, sans-serif"
-      >
-        VK
-      </text>
-    </svg>
-  );
+  return <BrandIcon src="/icons/vk.svg" alt="VK" size={size} />;
 }
-
 export function IconMax({ size = 16 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-      <defs>
-        <linearGradient id="maxgrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#00D9FF" />
-          <stop offset="1" stopColor="#7B5CFF" />
-        </linearGradient>
-      </defs>
-      <rect width="24" height="24" rx="6" fill="url(#maxgrad)" />
-      <text
-        x="12"
-        y="16"
-        textAnchor="middle"
-        fontSize="8"
-        fontWeight="900"
-        fill="#fff"
-        fontFamily="system-ui, sans-serif"
-      >
-        MAX
-      </text>
-    </svg>
-  );
+  return <BrandIcon src="/icons/max.svg" alt="MAX" size={size} />;
 }
 
 export function SocialIcons({ size = 46 }: { size?: number }) {
-  const wrap: CSSProperties = {
-    width: size,
-    height: size,
-    borderRadius: "50%",
+  const ring: CSSProperties = {
     display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    border: "1px solid #22304a",
-    background: "#10141d",
+    borderRadius: "50%",
     textDecoration: "none",
+    lineHeight: 0,
   };
   return (
-    <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+    <div
+      style={{
+        display: "flex",
+        gap: 12,
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
       <a
         className="btn"
         href={TG_CHANNEL}
         target="_blank"
         rel="noopener"
-        style={btnTg}
+        aria-label="Telegram"
+        style={{ ...ring, boxShadow: "0 0 18px rgba(42,171,238,.35)" }}
       >
-        <IconTg size={14} /> Telegram
+        <IconTg size={size} />
       </a>
       <a
         className="btn"
@@ -203,9 +185,9 @@ export function SocialIcons({ size = 46 }: { size?: number }) {
         target="_blank"
         rel="noopener"
         aria-label="VK"
-        style={wrap}
+        style={{ ...ring, boxShadow: "0 0 18px rgba(0,119,255,.35)" }}
       >
-        <IconVk size={Math.round(size * 0.55)} />
+        <IconVk size={size} />
       </a>
       <a
         className="btn"
@@ -213,15 +195,15 @@ export function SocialIcons({ size = 46 }: { size?: number }) {
         target="_blank"
         rel="noopener"
         aria-label="MAX"
-        style={wrap}
+        style={{ ...ring, boxShadow: "0 0 18px rgba(123,92,255,.35)" }}
       >
-        <IconMax size={Math.round(size * 0.55)} />
+        <IconMax size={size} />
       </a>
     </div>
   );
 }
-// ────────────────────────────────────────────────────────────────
 
+// ─────────── стили ───────────
 const btnBase: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
@@ -271,6 +253,7 @@ const stat: CSSProperties = {
   color: "#aeb9cc",
 };
 
+// ─────────── шапка ───────────
 export function Header() {
   return (
     <header
@@ -331,7 +314,7 @@ export function Header() {
             rel="noopener"
             style={btnTg}
           >
-            ✈ Telegram
+            <IconTg size={14} /> Telegram
           </a>
         </nav>
       </div>
@@ -339,6 +322,7 @@ export function Header() {
   );
 }
 
+// ─────────── hero ───────────
 export function Hero({
   total,
   stats,
@@ -426,6 +410,7 @@ export function Hero({
   );
 }
 
+// ─────────── рекламный блок ───────────
 export function PromoBanner() {
   return (
     <section
@@ -468,6 +453,7 @@ export function PromoBanner() {
   );
 }
 
+// ─────────── категории ───────────
 export function CategoryChips() {
   return (
     <nav
@@ -490,6 +476,7 @@ export function CategoryChips() {
   );
 }
 
+// ─────────── карточка объявления ───────────
 export function AdCard({ ad }: { ad: any }) {
   return (
     <article
@@ -607,6 +594,7 @@ export function AdCard({ ad }: { ad: any }) {
   );
 }
 
+// ─────────── пагинация ───────────
 export function Pagination({
   current,
   pages,
@@ -649,6 +637,7 @@ export function Pagination({
   );
 }
 
+// ─────────── подвал ───────────
 export function Footer() {
   return (
     <footer
@@ -686,11 +675,13 @@ export function Footer() {
   );
 }
 
+// ─────────── страница ленты ───────────
 export type FeedStats = {
   tg: number | null;
   vk: number | null;
   max: number | null;
 };
+
 export function FeedPage({
   ads,
   current,
