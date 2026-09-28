@@ -2,7 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getAdByTgId, getAllAdIds } from "@/lib/api";
 import { SITE, LOGO } from "@/lib/site";
-import { Header, Footer, btnTg, btnVk, chip } from "@/components/ui";
+import {
+  Header,
+  Footer,
+  btnTg,
+  btnVk,
+  chip,
+  PlaceholderArt,
+} from "@/components/ui";
 
 type Props = { params: Promise<{ id: string }> };
 
