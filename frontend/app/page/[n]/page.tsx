@@ -31,9 +31,10 @@ export default async function PageN({ params }: Props) {
     getVkMembers(),
   ]);
   const pages = Math.min(50, Math.max(1, Math.ceil(ads.length / PER_PAGE)));
+
   return (
     <FeedPage
-      ads={slice}
+      ads={ads.slice((num - 1) * PER_PAGE, num * PER_PAGE)}
       current={num}
       pages={pages}
       total={ads.length}
