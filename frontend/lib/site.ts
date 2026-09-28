@@ -15,3 +15,6 @@ export const CATEGORIES = [
   "окна",
   "другое",
 ];
+export const TG_CHT = "@dnrsabbath";
+export const VK_GROUP_ID_NUM = "203412616";
+export const MAX_MEMBERS: number | null = 353; // ← впишите число подписчиков MAX, например 340, или оставьте null — плашка скроется

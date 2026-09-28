@@ -1,9 +1,14 @@
 import { getAllAds } from "@/lib/api";
-import { PER_PAGE } from "@/lib/site";
+import { getTgMembers, getVkMembers } from "@/lib/stats";
+import { PER_PAGE, MAX_MEMBERS } from "@/lib/site";
 import { FeedPage } from "@/components/ui";
 
 export default async function Home() {
-  const ads = await getAllAds(1000);
+  const [ads, tg, vk] = await Promise.all([
+    getAllAds(1000),
+    getTgMembers(),
+    getVkMembers(),
+  ]);
   const pages = Math.min(50, Math.max(1, Math.ceil(ads.length / PER_PAGE)));
   return (
     <FeedPage
@@ -11,6 +16,7 @@ export default async function Home() {
       current={1}
       pages={pages}
       total={ads.length}
+      stats={{ tg, vk, max: MAX_MEMBERS }}
     />
   );
 }

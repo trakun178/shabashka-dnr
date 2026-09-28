@@ -8,6 +8,115 @@ import {
   CATEGORIES,
 } from "@/lib/site";
 
+// ─────────── заглушки по категориям + форматтер чисел ───────────
+const CAT_ART: Record<
+  string,
+  { emoji: string; glow: string; line: string; text: string }
+> = {
+  ремонт: {
+    emoji: "🛠️",
+    glow: "rgba(0,229,255,.28)",
+    line: "rgba(0,229,255,.35)",
+    text: "#67e8f9",
+  },
+  сантехника: {
+    emoji: "🚿",
+    glow: "rgba(74,163,255,.28)",
+    line: "rgba(74,163,255,.35)",
+    text: "#9ecbff",
+  },
+  электрика: {
+    emoji: "⚡",
+    glow: "rgba(255,214,10,.25)",
+    line: "rgba(255,214,10,.35)",
+    text: "#ffe066",
+  },
+  строительство: {
+    emoji: "🧱",
+    glow: "rgba(255,138,61,.25)",
+    line: "rgba(255,138,61,.35)",
+    text: "#ffb38a",
+  },
+  грузчики: {
+    emoji: "📦",
+    glow: "rgba(167,139,250,.25)",
+    line: "rgba(167,139,250,.35)",
+    text: "#c4b5fd",
+  },
+  уборка: {
+    emoji: "🧹",
+    glow: "rgba(124,252,155,.22)",
+    line: "rgba(124,252,155,.32)",
+    text: "#7cfc9b",
+  },
+  окна: {
+    emoji: "🪟",
+    glow: "rgba(103,232,249,.25)",
+    line: "rgba(103,232,249,.35)",
+    text: "#67e8f9",
+  },
+  другое: {
+    emoji: "🧰",
+    glow: "rgba(255,45,120,.25)",
+    line: "rgba(255,45,120,.35)",
+    text: "#ff8ab5",
+  },
+};
+
+export function PlaceholderArt({
+  category,
+  height = 230,
+}: {
+  category?: string;
+  height?: number;
+}) {
+  const key = category && CAT_ART[category] ? category : "другое";
+  const art = CAT_ART[key];
+  return (
+    <div
+      style={{
+        height,
+        borderRadius: 10,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 10,
+        background: `radial-gradient(120% 130% at 15% 0%, ${art.glow} 0%, transparent 55%), linear-gradient(135deg, #101722 0%, #0b0e14 100%)`,
+        border: `1px solid ${art.line}`,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 58,
+          lineHeight: 1,
+          filter: `drop-shadow(0 0 18px ${art.glow})`,
+        }}
+      >
+        {art.emoji}
+      </div>
+      <div
+        style={{
+          color: art.text,
+          fontSize: 11,
+          letterSpacing: 3,
+          fontWeight: 800,
+          textTransform: "uppercase",
+        }}
+      >
+        {key}
+      </div>
+    </div>
+  );
+}
+
+export function fmt(n: number | null | undefined): string {
+  if (n == null) return "—";
+  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(".0", "")}K`;
+  return String(n);
+}
+// ────────────────────────────────────────────────────────────────
+
 const btnBase: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
@@ -125,7 +234,13 @@ export function Header() {
   );
 }
 
-export function Hero({ total }: { total: number }) {
+export function Hero({
+  total,
+  stats,
+}: {
+  total: number;
+  stats?: { tg: number | null; vk: number | null; max: number | null };
+}) {
   return (
     <section style={{ textAlign: "center", padding: "44px 16px 8px" }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -190,7 +305,11 @@ export function Hero({ total }: { total: number }) {
         }}
       >
         <span style={stat}>📄 {total} постов</span>
-        <span style={stat}>👥 1.5K подписчиков</span>
+        <span style={stat}>👥 {fmt(stats?.tg)} подписчиков</span>
+        {stats?.vk != null && <span style={stat}>💙 {fmt(stats.vk)} в VK</span>}
+        {stats?.max != null && (
+          <span style={stat}>Ⓜ {fmt(stats.max)} в MAX</span>
+        )}
         <span style={{ ...stat, color: "#7cfc9b", borderColor: "#1d4a2c" }}>
           <span className="live">●</span> в эфире
         </span>
@@ -305,18 +424,7 @@ export function AdCard({ ad }: { ad: any }) {
             }}
           />
         ) : (
-          <div
-            style={{
-              height: 230,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#39435a",
-              fontSize: 13,
-            }}
-          >
-            без фото
-          </div>
+          <PlaceholderArt category={ad.category} />
         )}
       </Link>
       <div
@@ -515,21 +623,28 @@ export function Footer() {
   );
 }
 
+export type FeedStats = {
+  tg: number | null;
+  vk: number | null;
+  max: number | null;
+};
 export function FeedPage({
   ads,
   current,
   pages,
   total,
+  stats,
 }: {
   ads: any[];
   current: number;
   pages: number;
   total: number;
+  stats?: FeedStats;
 }) {
   return (
     <>
       <Header />
-      <Hero total={total} />
+      <Hero total={total} stats={stats} />
       <CategoryChips />
       <PromoBanner />
       <main

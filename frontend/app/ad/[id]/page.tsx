@@ -97,6 +97,9 @@ export default async function AdPage({ params }: Props) {
             <span style={{ color: "#67e8f9" }}>👤 От: {ad.forwarded_from}</span>
           )}
         </div>
+        {photos.length === 0 && (
+          <PlaceholderArt category={ad.category} height={340} />
+        )}
         {photos.map((src) => (
           // eslint-disable-next-line @next/next/no-img-element
           <img
