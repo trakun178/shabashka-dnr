@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getAllAds } from "@/lib/api";
+import { getTgMembers, getVkMembers } from "@/lib/stats";
 import { PER_PAGE, SITE } from "@/lib/site";
 import { FeedPage } from "@/components/ui";
 

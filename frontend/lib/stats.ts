@@ -1,11 +1,11 @@
-import { TG_CHAT, VK_GROUP_ID_NUM } from "@/lib/site";
+import { TG_CHANNEL_ID, VK_GROUP_ID_NUM } from "@/lib/site";
 
 export async function getTgMembers(): Promise<number | null> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return null;
   try {
     const res = await fetch(
-      `https://api.telegram.org/bot${token}/getChat?chat_id=${encodeURIComponent(TG_CHT)}`,
+      `https://api.telegram.org/bot${token}/getChat?chat_id=${encodeURIComponent(TG_CHANNEL_ID)}`,
     );
     if (!res.ok) return null;
     const j = await res.json();
