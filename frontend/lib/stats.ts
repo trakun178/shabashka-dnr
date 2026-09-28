@@ -1,15 +1,19 @@
 import { TG_CHANNEL_ID, VK_GROUP_ID_NUM } from "@/lib/site";
 
 export async function getTgMembers(): Promise<number | null> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) return null;
   try {
     const res = await fetch(
-      `https://api.telegram.org/bot${token}/getChat?chat_id=${encodeURIComponent(TG_CHANNEL_ID)}`,
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/parser_state?id=eq.1&select=tg_members`,
+      {
+        headers: {
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_KEY!,
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_KEY!}`,
+        },
+      },
     );
     if (!res.ok) return null;
-    const j = await res.json();
-    return j?.ok ? (j.result.members_count as number) : null;
+    const rows = await res.json();
+    return rows?.[0]?.tg_members ?? null;
   } catch {
     return null;
   }

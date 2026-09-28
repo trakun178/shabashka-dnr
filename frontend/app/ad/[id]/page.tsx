@@ -9,6 +9,8 @@ import {
   btnVk,
   chip,
   PlaceholderArt,
+  IconTg,
+  IconVk,
 } from "@/components/ui";
 
 type Props = { params: Promise<{ id: string }> };
@@ -105,7 +107,9 @@ export default async function AdPage({ params }: Props) {
           )}
         </div>
         {photos.length === 0 && (
-          <PlaceholderArt category={ad.category} height={340} />
+          <div style={{ marginTop: 18 }}>
+            <PlaceholderArt category={ad.category} height={340} />
+          </div>
         )}
         {photos.map((src) => (
           // eslint-disable-next-line @next/next/no-img-element
@@ -157,7 +161,7 @@ export default async function AdPage({ params }: Props) {
               rel="noopener"
               style={btnTg}
             >
-              ✈ Открыть в Telegram
+              <IconTg size={14} /> Открыть в Telegram
             </a>
           )}
           {ad.vk_post_url && (
@@ -168,7 +172,7 @@ export default async function AdPage({ params }: Props) {
               rel="noopener"
               style={btnVk}
             >
-              💙 Пост в VK
+              <IconVk size={14} /> Пост в VK
             </a>
           )}
         </div>

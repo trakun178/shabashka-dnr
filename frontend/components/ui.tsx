@@ -115,6 +115,111 @@ export function fmt(n: number | null | undefined): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1).replace(".0", "")}K`;
   return String(n);
 }
+
+export function IconTg({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+    </svg>
+  );
+}
+
+export function IconVk({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <rect width="24" height="24" rx="6" fill="#0077FF" />
+      <text
+        x="12"
+        y="16.5"
+        textAnchor="middle"
+        fontSize="10"
+        fontWeight="800"
+        fill="#fff"
+        fontFamily="system-ui, sans-serif"
+      >
+        VK
+      </text>
+    </svg>
+  );
+}
+
+export function IconMax({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <defs>
+        <linearGradient id="maxgrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#00D9FF" />
+          <stop offset="1" stopColor="#7B5CFF" />
+        </linearGradient>
+      </defs>
+      <rect width="24" height="24" rx="6" fill="url(#maxgrad)" />
+      <text
+        x="12"
+        y="16"
+        textAnchor="middle"
+        fontSize="8"
+        fontWeight="900"
+        fill="#fff"
+        fontFamily="system-ui, sans-serif"
+      >
+        MAX
+      </text>
+    </svg>
+  );
+}
+
+export function SocialIcons({ size = 46 }: { size?: number }) {
+  const wrap: CSSProperties = {
+    width: size,
+    height: size,
+    borderRadius: "50%",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    border: "1px solid #22304a",
+    background: "#10141d",
+    textDecoration: "none",
+  };
+  return (
+    <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+      <a
+        className="btn"
+        href={TG_CHANNEL}
+        target="_blank"
+        rel="noopener"
+        style={btnTg}
+      >
+        <IconTg size={14} /> Telegram
+      </a>
+      <a
+        className="btn"
+        href={VK_GROUP}
+        target="_blank"
+        rel="noopener"
+        aria-label="VK"
+        style={wrap}
+      >
+        <IconVk size={Math.round(size * 0.55)} />
+      </a>
+      <a
+        className="btn"
+        href={MAX_CHANNEL}
+        target="_blank"
+        rel="noopener"
+        aria-label="MAX"
+        style={wrap}
+      >
+        <IconMax size={Math.round(size * 0.55)} />
+      </a>
+    </div>
+  );
+}
 // ────────────────────────────────────────────────────────────────
 
 const btnBase: CSSProperties = {
@@ -314,16 +419,8 @@ export function Hero({
           <span className="live">●</span> в эфире
         </span>
       </div>
-      <div style={{ marginTop: 18 }}>
-        <a
-          className="btn"
-          href={TG_CHANNEL}
-          target="_blank"
-          rel="noopener"
-          style={{ ...btnTg, padding: "10px 24px", fontSize: 14 }}
-        >
-          ✈ Подписаться в Telegram
-        </a>
+      <div style={{ marginTop: 20 }}>
+        <SocialIcons />
       </div>
     </section>
   );
@@ -490,7 +587,7 @@ export function AdCard({ ad }: { ad: any }) {
               rel="noopener"
               style={btnTg}
             >
-              ✈ В Telegram
+              <IconTg size={14} /> В Telegram
             </a>
           )}
           {ad.vk_post_url && (
@@ -501,7 +598,7 @@ export function AdCard({ ad }: { ad: any }) {
               rel="noopener"
               style={btnVk}
             >
-              💙 В VK
+              <IconVk size={14} /> В VK
             </a>
           )}
         </div>
@@ -578,42 +675,8 @@ export function Footer() {
           сборка мебели. Свежие объявления из Telegram-канала «Шабашка DNR» —
           обновление автоматически каждый день.
         </p>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            gap: 10,
-            marginTop: 18,
-            flexWrap: "wrap",
-          }}
-        >
-          <a
-            className="btn"
-            href={TG_CHANNEL}
-            target="_blank"
-            rel="noopener"
-            style={btnTg}
-          >
-            ✈ Telegram-канал
-          </a>
-          <a
-            className="btn"
-            href={VK_GROUP}
-            target="_blank"
-            rel="noopener"
-            style={btnVk}
-          >
-            💙 VK-группа
-          </a>
-          <a
-            className="btn"
-            href={MAX_CHANNEL}
-            target="_blank"
-            rel="noopener"
-            style={btnMax}
-          >
-            Ⓜ MAX-канал
-          </a>
+        <div style={{ marginTop: 18 }}>
+          <SocialIcons size={44} />
         </div>
         <div style={{ color: "#43506a", fontSize: 12, marginTop: 20 }}>
           © {new Date().getFullYear()} Шабашка DNR · shabashka.sofoniya.ru

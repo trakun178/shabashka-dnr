@@ -143,6 +143,22 @@ def reset_flood_streak():
         pass
 
 
+def get_tg_members():
+    """Число подписчиков канала — пишем в БД, сайт читает оттуда."""
+    try:
+        r = requests.get(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/getChat",
+            params={"chat_id": "@dnrsabbath"},
+            timeout=30,
+        )
+        j = r.json()
+        if j.get("ok"):
+            return j["result"].get("members_count")
+    except Exception as e:
+        print(f"   ⚠️ Не удалось получить число подписчиков: {mask_secret(e)}")
+    return None
+
+
 def get_file_url(file_id):
     """Временная ссылка Telegram (~1 час). ТОЛЬКО для скачивания, не в БД."""
     try:
@@ -312,6 +328,18 @@ def get_channel_updates():
 
     data = response.json()
     state_row = data[0] if data else {}
+    tg_members = get_tg_members()
+    if tg_members is not None:
+        try:
+            requests.patch(
+                f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1",
+                headers=HEADERS,
+                json={"tg_members": tg_members},
+                timeout=30,
+            )
+            print(f"   👥 Подписчиков TG: {tg_members}")
+        except Exception:
+            pass
     last_id = state_row.get("last_message_id", 0) or 0
     vk_album_id = state_row.get("vk_album_id")
 
