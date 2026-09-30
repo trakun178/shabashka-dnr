@@ -1,6 +1,6 @@
-import { MAX_MEMBERS, MAX_CHANNEL } from "@/lib/site";
-
-const TG_CHAT_ID = "@dnrsabbath";
+// Хендл канала для Telegram Bot API — объявляем прямо здесь,
+// чтобы не зависеть от имён в site.ts
+const TG_CHANNEL_HANDLE = "@dnrsabbath";
 
 export async function getTgMembers(): Promise<number | null> {
   // 1) Из БД: парсер пишет tg_members каждые 15 минут
@@ -19,17 +19,19 @@ export async function getTgMembers(): Promise<number | null> {
       const v = rows?.[0]?.tg_members;
       if (typeof v === "number" && v > 0) return v;
     }
-  } catch {}
-  // 2) Фолбэк: прямой запрос в Telegram во время сборки сайта
+  } catch {
+    // тихо продолжаем к фолбэку
+  }
+  // 2) Фолбэк: прямой запрос в Telegram во время сборки
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return null;
   try {
     const res = await fetch(
-      `https://api.telegram.org/bot${token}/getChat?chat_id=${encodeURIComponent(TG_CHAT_ID)}`,
+      `https://api.telegram.org/bot${token}/getChatMemberCount?chat_id=${encodeURIComponent(TG_CHANNEL_HANDLE)}`,
     );
     if (!res.ok) return null;
     const j = await res.json();
-    return j?.ok ? (j.result?.members_count ?? null) : null;
+    return j?.ok && typeof j.result === "number" ? j.result : null;
   } catch {
     return null;
   }
@@ -50,35 +52,7 @@ export async function getVkMembers(): Promise<number | null> {
   }
 }
 
-function parseCount(raw: string): number | null {
-  let s = raw.replace(/[\s\u00A0]/g, "").replace(",", ".");
-  let mult = 1;
-  if (/тыс|k/i.test(s)) {
-    mult = 1000;
-    s = s.replace(/[kKтыс.]/gi, "");
-  } else if (/млн|m/i.test(s)) {
-    mult = 1000000;
-    s = s.replace(/[mMмлн.]/gi, "");
-  }
-  const n = parseFloat(s);
-  return isNaN(n) ? null : Math.round(n * mult);
-}
-
 export async function getMaxMembers(): Promise<number | null> {
-  try {
-    const res = await fetch(MAX_CHANNEL, {
-      headers: { "User-Agent": "Mozilla/5.0" },
-    });
-    if (res.ok) {
-      const html = await res.text();
-      const m = html.match(
-        /([\d\s\u00A0.,]+[KkMm]?(?:тыс|млн)?)\s*(?:подписчик|subscriber)/i,
-      );
-      if (m) {
-        const n = parseCount(m[1]);
-        if (n != null && n > 0) return n;
-      }
-    }
-  } catch {}
-  return MAX_MEMBERS;
+  // MAX не имеет открытого API — возвращаем null, плашка просто скрывается
+  return null;
 }

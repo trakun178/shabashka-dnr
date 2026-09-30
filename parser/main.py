@@ -332,21 +332,18 @@ def get_channel_updates():
     last_id = state_row.get("last_message_id", 0) or 0
     vk_album_id = state_row.get("vk_album_id")
 
-    # 👥 Пишем живое число подписчиков TG в БД (сайт читает оттуда)
-    tg_members = get_tg_members()
-    if tg_members is not None:
-        r = requests.patch(
-            f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1",
-            headers=HEADERS,
-            json={"tg_members": tg_members},
-            timeout=30,
-        )
-        if r.status_code in (200, 204):
-            print(f"   👥 Подписчиков TG: {tg_members} (записано в БД)")
-        else:
-            print(f"   🚨 tg_members НЕ записан: {r.status_code} {r.text[:200]}")
-    else:
-        print("   ⚠️ tg_members: Telegram не отдал число (причина — строкой выше)")
+    def get_tg_members():
+     """Число подписчиков канала — пишем в БД, сайт читает оттуда."""
+    try:
+        url = "https://api.telegram.org/bot" + BOT_TOKEN + "/getChatMemberCount"
+        r = requests.get(url, params={"chat_id": "@dnrsabbath"}, timeout=30)
+        j = r.json()
+        if j.get("ok"):
+            return j.get("result")  # сразу число
+        print(f"   ⚠️ Telegram getChatMemberCount: код {j.get('error_code')}, {j.get('description')}")
+    except Exception as e:
+        print(f"   ⚠️ Сетевая ошибка getChatMemberCount: {mask_secret(e)}")
+    return None
 
     # ⛔ Проверка паузы VK: пока метка активна — ноль запросов к VK
     vk_blocked_until = parse_ts(state_row.get("vk_blocked_until"))
