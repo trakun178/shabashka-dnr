@@ -1,9 +1,9 @@
 import { MAX_MEMBERS, MAX_CHANNEL } from "@/lib/site";
 
-const TG_CHAT_ID = "@dnrsabbath"; // хендл канала именно для getChat
+const TG_CHAT_ID = "@dnrsabbath";
 
 export async function getTgMembers(): Promise<number | null> {
-  // 1) Читаем из БД — парсер пишет туда каждые 15 минут
+  // 1) Из БД: парсер пишет tg_members каждые 15 минут
   try {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/parser_state?id=eq.1&select=tg_members`,
@@ -20,7 +20,7 @@ export async function getTgMembers(): Promise<number | null> {
       if (typeof v === "number" && v > 0) return v;
     }
   } catch {}
-  // 2) Фолбэк: прямой запрос в Telegram прямо во время сборки сайта
+  // 2) Фолбэк: прямой запрос в Telegram во время сборки сайта
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return null;
   try {
@@ -65,7 +65,6 @@ function parseCount(raw: string): number | null {
 }
 
 export async function getMaxMembers(): Promise<number | null> {
-  // 1) Пытаемся прочитать число подписчиков прямо со страницы MAX-канала
   try {
     const res = await fetch(MAX_CHANNEL, {
       headers: { "User-Agent": "Mozilla/5.0" },
@@ -81,6 +80,5 @@ export async function getMaxMembers(): Promise<number | null> {
       }
     }
   } catch {}
-  // 2) Фолбэк: константа из site.ts (или null — тогда плашка просто скрыта)
   return MAX_MEMBERS;
 }
