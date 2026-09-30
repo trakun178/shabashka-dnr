@@ -35,7 +35,7 @@ SITE_BASE = "https://shabashka.sofoniya.ru"
 VK_MAX_PHOTO_BYTES = 5 * 1024 * 1024
 VK_POST_DELAY = 60  # пауза между VK-постами внутри одного запуска
 
-# 📯 Режим работы: публикуем ВСЕ посты запуска в VK, без дневного потолка.
+# 📯 Режим: публикуем ВСЕ посты запуска в VK, без дневного потолка.
 # Защита от Error 9: задержка между постами, fail-fast по девятке,
 # прогрессивная пауза 1/6/24 ч, кэш upload_url в аплоадере.
 
@@ -154,6 +154,7 @@ def get_tg_members():
         j = r.json()
         if j.get("ok"):
             return j["result"].get("members_count")
+        print(f"   ⚠️ Telegram ответил ошибкой: {j.get('description')}")
     except Exception as e:
         print(f"   ⚠️ Не удалось получить число подписчиков: {mask_secret(e)}")
     return None
@@ -328,6 +329,10 @@ def get_channel_updates():
 
     data = response.json()
     state_row = data[0] if data else {}
+    last_id = state_row.get("last_message_id", 0) or 0
+    vk_album_id = state_row.get("vk_album_id")
+
+    # 👥 Пишем живое число подписчиков TG в БД (сайт читает оттуда)
     tg_members = get_tg_members()
     if tg_members is not None:
         try:
@@ -338,10 +343,8 @@ def get_channel_updates():
                 timeout=30,
             )
             print(f"   👥 Подписчиков TG: {tg_members}")
-        except Exception:
-            pass
-    last_id = state_row.get("last_message_id", 0) or 0
-    vk_album_id = state_row.get("vk_album_id")
+        except Exception as e:
+            print(f"   ⚠️ tg_members не сохранён: {e}")
 
     # ⛔ Проверка паузы VK: пока метка активна — ноль запросов к VK
     vk_blocked_until = parse_ts(state_row.get("vk_blocked_until"))

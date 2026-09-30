@@ -17,4 +17,4 @@ export const CATEGORIES = [
 ];
 export const TG_CHANNEL_ID = "@dnrsabbath";
 export const VK_GROUP_ID_NUM = "203412616";
-export const MAX_MEMBERS: number | null = 353; // ← впишите число подписчиков MAX, например 340, или оставьте null — плашка скроется
+export const MAX_MEMBERS: number | null = null; // ← впишите число подписчиков MAX, например 340, или оставьте null — плашка скроется

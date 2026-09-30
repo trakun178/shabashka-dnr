@@ -34,6 +34,17 @@ export async function getAllAds(limit = 1000): Promise<any[]> {
   return res.json();
 }
 
+export async function getAdsCount(): Promise<number> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/ads?select=tg_message_id&limit=1`,
+    { headers: { ...headers, Prefer: "count=exact" } },
+  );
+  if (!res.ok) return 0;
+  const range = res.headers.get("content-range"); // вида "0-0/1046"
+  const m = range?.match(/\/(\d+)$/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
 export async function getAdsByCategory(
   category: string,
   limit = 200,
