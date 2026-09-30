@@ -154,7 +154,7 @@ def get_tg_members():
         j = r.json()
         if j.get("ok"):
             return j["result"].get("members_count")
-        print(f"   ⚠️ Telegram ответил ошибкой: {j.get('description')}")
+        print(f"   ⚠️ Telegram getChat ответил ошибкой: {j.get('description')}")
     except Exception as e:
         print(f"   ⚠️ Не удалось получить число подписчиков: {mask_secret(e)}")
     return None
@@ -335,16 +335,18 @@ def get_channel_updates():
     # 👥 Пишем живое число подписчиков TG в БД (сайт читает оттуда)
     tg_members = get_tg_members()
     if tg_members is not None:
-        try:
-            requests.patch(
-                f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1",
-                headers=HEADERS,
-                json={"tg_members": tg_members},
-                timeout=30,
-            )
-            print(f"   👥 Подписчиков TG: {tg_members}")
-        except Exception as e:
-            print(f"   ⚠️ tg_members не сохранён: {e}")
+        r = requests.patch(
+            f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1",
+            headers=HEADERS,
+            json={"tg_members": tg_members},
+            timeout=30,
+        )
+        if r.status_code in (200, 204):
+            print(f"   👥 Подписчиков TG: {tg_members} (записано в БД)")
+        else:
+            print(f"   🚨 tg_members НЕ записан: {r.status_code} {r.text[:200]}")
+    else:
+        print("   ⚠️ tg_members: Telegram не отдал число (причина — строкой выше)")
 
     # ⛔ Проверка паузы VK: пока метка активна — ноль запросов к VK
     vk_blocked_until = parse_ts(state_row.get("vk_blocked_until"))
