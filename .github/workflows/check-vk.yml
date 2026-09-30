@@ -1,0 +1,20 @@
+name: Check VK keys
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install requests
+        run: pip install requests
+      - name: Probe keys
+        env:
+          VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
+          VK_TOKEN: ${{ secrets.VK_TOKEN }}
+        run: python parser/check_vk.py
