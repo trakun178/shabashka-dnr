@@ -17,4 +17,8 @@ jobs:
         env:
           VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
           VK_TOKEN: ${{ secrets.VK_TOKEN }}
+          VK_TOKEN_WIFE: ${{ secrets.VK_TOKEN_WIFE }}
+          VK_TOKEN_WIFE_1: ${{ secrets.VK_TOKEN_WIFE_1 }}
+          VK_TOKEN_WIFE_2: ${{ secrets.VK_TOKEN_WIFE_2 }}
+          VK_TOKEN_WIFE_ANNA: ${{ secrets.VK_TOKEN_WIFE_ANNA }}
         run: python parser/check_vk.py

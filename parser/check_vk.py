@@ -25,6 +25,19 @@ def call(token: str, method: str, params: dict = None):
     return {"ok": True, "response": data.get("response")}
 
 
+def first_group(resp):
+    """groups.getById у разных ключей/версий отдаёт то список, то словарь."""
+    if isinstance(resp, list):
+        return resp[0] if resp else None
+    if isinstance(resp, dict):
+        items = resp.get("items")
+        if isinstance(items, list) and items:
+            return items[0]
+        if resp.get("id"):
+            return resp
+    return None
+
+
 def describe(res):
     if res.get("ok"):
         return "✅ OK"
@@ -53,13 +66,14 @@ def probe(name: str, token: str):
         print(f"   Тип: пользовательский ключ ({u.get('first_name')} {u.get('last_name')}, id {u.get('id')})")
     else:
         grp = call(token, "groups.getById")
-        if grp.get("ok") and grp.get("response"):
-            print(f"   Тип: групповой ключ ({grp['response'][0].get('name')})")
+        g = first_group(grp.get("response")) if grp.get("ok") else None
+        if g:
+            print(f"   Тип: групповой ключ ({g.get('name')}, id {g.get('id')})")
         else:
             print(f"   Тип: не опознан — users.get -> {describe(who)}")
     time.sleep(2)
 
-    # зонд стены: БЕЗ message → успех невозможен, но код ошибки всё говорит:
+    # зонд стены: БЕЗ message → пост не создастся, но код ошибки всё говорит:
     # 100 = стена доступна и флуда нет, 9 = флуд, 15 = нет прав
     wall = call(token, "wall.post", {"owner_id": f"-{GROUP_ID}", "from_group": 1})
     print(f"   wall.post (без текста):        {describe(wall)}")
