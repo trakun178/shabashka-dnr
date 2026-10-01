@@ -329,6 +329,7 @@ def get_channel_updates():
 
     data = response.json()
     state_row = data[0] if data else {}
+    print(f"   🧾 state: last_id={state_row.get('last_message_id')}, blocked_until={state_row.get('vk_blocked_until')}, streak={state_row.get('vk_flood_streak')}")
     last_id = state_row.get("last_message_id", 0) or 0
     vk_album_id = state_row.get("vk_album_id")
 
@@ -373,6 +374,8 @@ def get_channel_updates():
         last_id = real_last_id
 
     print(f"✅ Будем искать сообщения > {last_id}")
+    
+    print(f"   📡 getUpdates: offset={last_id + 1}")
 
     telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
     params = {"limit": 100, "timeout": 30, "offset": last_id + 1}
@@ -598,4 +601,10 @@ def get_channel_updates():
 
 
 if __name__ == '__main__':
-    get_channel_updates()
+    try:
+        get_channel_updates()
+    except Exception:
+        import traceback
+        print("💥 ПАРСЕР УПАЛ С ОШИБКОЙ:")
+        traceback.print_exc()
+        raise

@@ -33,4 +33,4 @@ jobs:
           VK_GROUP_ID: ${{ secrets.VK_GROUP_ID }}
         run: |
           cd parser
-          python main.py
+            python -u main.py
