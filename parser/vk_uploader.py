@@ -20,7 +20,7 @@ UPLOAD_URL_TTL = 15 * 60
 
 
 def normalize_image(content: bytes) -> bytes:
-    """Перекодирует фото в чистый baseline JPEG: новый "холст" (без ICC/EXIF),
+    """Перекодирует фото в чистый baseline JPEG: новый холст (без ICC/EXIF),
     RGB, сторона <= 1280 px, вес <= 5 МБ. Используется и парсером напрямую."""
     if not HAS_PIL:
         print("⚠️ Pillow не установлен — отправляем как есть")
@@ -322,6 +322,9 @@ class VKUploader:
                 upload_response, route = self._upload_one(temp_file)
                 if self._upload_response_ok(upload_response, route):
                     break
+                # если upload_url нет (Error 27) — ретрай бессмыслен, сразу выходим
+                if upload_response is None and route is None:
+                    break
                 if attempt == 1:
                     print("⚠️ VK не принял файл — одна повторная попытка")
                     time.sleep(3)
@@ -366,8 +369,8 @@ class VKUploader:
         attachments = []
         vk_photo_urls = []
 
-        # ✅ Ссылка на сайт идёт ПЕРВОЙ ссылкой в посте: VK построит превью
-        #    с фото и описанием из OG-тегов страницы объявления
+        # Ссылка на сайт идёт ПЕРВОЙ ссылкой в посте: VK построит превью
+        # с фото и описанием из OG-тегов страницы объявления
         footer_parts = [f"📢 Источник: {self.source_name}"]
         if site_link:
             footer_parts.append(f"🌐 Объявление с фото: {site_link}")
