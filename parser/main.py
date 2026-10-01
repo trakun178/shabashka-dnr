@@ -7,6 +7,7 @@ from datetime import datetime, timezone, timedelta
 import requests
 from dotenv import load_dotenv
 
+# ────────────────────────── переменные окружения ──────────────────────────
 env_path = os.path.join(os.path.dirname(__file__), '.env')
 if os.path.exists(env_path):
     print("📁 Загружаем переменные из .env файла...")
@@ -31,11 +32,12 @@ print(f"  VK_TOKEN: {'✅' if VK_TOKEN else '❌'}")
 print(f"  VK_GROUP_ID: {'✅' if VK_GROUP_ID else '❌'}")
 print("=" * 50)
 
+# ────────────────────────── константы ──────────────────────────
 SITE_BASE = "https://shabashka.sofoniya.ru"
 VK_MAX_PHOTO_BYTES = 5 * 1024 * 1024
 VK_POST_DELAY = 60  # пауза между VK-постами внутри одного запуска
 
-# 📯 Режим: публикуем ВСЕ посты запуска в VK, без дневного потолка.
+# Режим работы: публикуем ВСЕ посты запуска в VK, без дневного потолка.
 # Защита от Error 9: задержка между постами, fail-fast по девятке,
 # прогрессивная пауза 1/6/24 ч, кэш upload_url в аплоадере.
 
@@ -59,7 +61,7 @@ HEADERS = {
 
 
 def mask_secret(text):
-    """✅ Прячем токен бота из логов."""
+    """Прячем токен бота из логов."""
     if text and BOT_TOKEN:
         return str(text).replace(BOT_TOKEN, '***')
     return text
@@ -96,7 +98,7 @@ def save_album_id(album_id):
 
 
 def pause_vk(hours):
-    """⛔ Пауза VK на N часов с проверкой, что метка РЕАЛЬНО записалась."""
+    """Пауза VK на N часов с проверкой, что метка РЕАЛЬНО записалась."""
     until = (datetime.now(timezone(timedelta(hours=3))) + timedelta(hours=hours)).isoformat()
     try:
         r = requests.patch(
@@ -146,17 +148,14 @@ def reset_flood_streak():
 def get_tg_members():
     """Число подписчиков канала — пишем в БД, сайт читает оттуда."""
     try:
-        r = requests.get(
-            f"https://api.telegram.org/bot{BOT_TOKEN}/getChat",
-            params={"chat_id": "@dnrsabbath"},
-            timeout=30,
-        )
+        url = "https://api.telegram.org/bot" + BOT_TOKEN + "/getChatMemberCount"
+        r = requests.get(url, params={"chat_id": "@dnrsabbath"}, timeout=30)
         j = r.json()
         if j.get("ok"):
-            return j["result"].get("members_count")
-        print(f"   ⚠️ Telegram getChat ответил ошибкой: {j.get('description')}")
+            return j.get("result")
+        print(f"   ⚠️ Telegram getChatMemberCount: код {j.get('error_code')}, {j.get('description')}")
     except Exception as e:
-        print(f"   ⚠️ Не удалось получить число подписчиков: {mask_secret(e)}")
+        print(f"   ⚠️ Сетевая ошибка getChatMemberCount: {mask_secret(e)}")
     return None
 
 
@@ -174,7 +173,7 @@ def get_file_url(file_id):
 
 
 def upload_photo_to_storage(content: bytes, message_id: int):
-    """✅ Кладёт фото в Supabase Storage (бакет ads), возвращает постоянную ссылку."""
+    """Кладёт фото в Supabase Storage (бакет ads), возвращает постоянную ссылку."""
     name = f"{message_id}.jpg"
     try:
         r = requests.post(
@@ -214,7 +213,7 @@ def download_and_store(file_id, message_id):
 
 
 def pick_photo_size(sizes):
-    """✅ Наибольший размер фото, проходящий под лимит VK (≤ 5 МБ)."""
+    """Наибольший размер фото, проходящий под лимит VK (≤ 5 МБ)."""
     if not sizes:
         return None
     with_size = [s for s in sizes if (s.get("file_size") or 0) > 0]
@@ -329,22 +328,30 @@ def get_channel_updates():
 
     data = response.json()
     state_row = data[0] if data else {}
-    print(f"   🧾 state: last_id={state_row.get('last_message_id')}, blocked_until={state_row.get('vk_blocked_until')}, streak={state_row.get('vk_flood_streak')}")
+    print(f"   🧾 state: last_id={state_row.get('last_message_id')}, "
+          f"blocked_until={state_row.get('vk_blocked_until')}, streak={state_row.get('vk_flood_streak')}")
+
+    # 👥 Пишем живое число подписчиков TG в БД (сайт читает оттуда)
+    tg_members = get_tg_members()
+    if tg_members is not None:
+        try:
+            r = requests.patch(
+                f"{SUPABASE_URL}/rest/v1/parser_state?id=eq.1",
+                headers=HEADERS,
+                json={"tg_members": tg_members},
+                timeout=30,
+            )
+            if r.status_code in (200, 204):
+                print(f"   👥 Подписчиков TG: {tg_members} (записано в БД)")
+            else:
+                print(f"   🚨 tg_members НЕ записан: {r.status_code} {r.text[:200]}")
+        except Exception as e:
+            print(f"   🚨 tg_members НЕ записан (сеть): {e}")
+    else:
+        print("   ⚠️ tg_members: число не получено, причина — строкой выше")
+
     last_id = state_row.get("last_message_id", 0) or 0
     vk_album_id = state_row.get("vk_album_id")
-
-    def get_tg_members():
-     """Число подписчиков канала — пишем в БД, сайт читает оттуда."""
-    try:
-        url = "https://api.telegram.org/bot" + BOT_TOKEN + "/getChatMemberCount"
-        r = requests.get(url, params={"chat_id": "@dnrsabbath"}, timeout=30)
-        j = r.json()
-        if j.get("ok"):
-            return j.get("result")  # сразу число
-        print(f"   ⚠️ Telegram getChatMemberCount: код {j.get('error_code')}, {j.get('description')}")
-    except Exception as e:
-        print(f"   ⚠️ Сетевая ошибка getChatMemberCount: {mask_secret(e)}")
-    return None
 
     # ⛔ Проверка паузы VK: пока метка активна — ноль запросов к VK
     vk_blocked_until = parse_ts(state_row.get("vk_blocked_until"))
@@ -374,8 +381,6 @@ def get_channel_updates():
         last_id = real_last_id
 
     print(f"✅ Будем искать сообщения > {last_id}")
-    
-    print(f"   📡 getUpdates: offset={last_id + 1}")
 
     telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
     params = {"limit": 100, "timeout": 30, "offset": last_id + 1}
@@ -465,8 +470,6 @@ def get_channel_updates():
                 vk_posts_count += 1
                 reset_flood_streak()
                 print(f"  ✅ Пост в VK: {vk_result['post_url']}")
-
-                # ✅ Умная задержка: только если это не последний пост запуска
                 is_last_item = (idx == len(group_keys) - 1) and (len(single_messages) == 0)
                 if not is_last_item:
                     print(f"  ⏱️ Ожидание {VK_POST_DELAY} секунд перед следующим постом...")
@@ -540,7 +543,6 @@ def get_channel_updates():
                 vk_posts_count += 1
                 reset_flood_streak()
                 print(f"  ✅ Пост в VK: {vk_result['post_url']}")
-
                 if idx < len(single_messages) - 1:
                     print(f"  ⏱️ Ожидание {VK_POST_DELAY} секунд перед следующим постом...")
                     time.sleep(VK_POST_DELAY)
@@ -603,8 +605,9 @@ def get_channel_updates():
 if __name__ == '__main__':
     try:
         get_channel_updates()
-    except Exception:
+    except BaseException:
         import traceback
         print("💥 ПАРСЕР УПАЛ С ОШИБКОЙ:")
         traceback.print_exc()
         raise
+    print("🏁 main.py дошёл до конца")
