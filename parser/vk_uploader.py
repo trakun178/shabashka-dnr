@@ -373,7 +373,7 @@ class VKUploader:
         # с фото и описанием из OG-тегов страницы объявления
         footer_parts = [f"📢 Источник: {self.source_name}"]
         if site_link:
-            footer_parts.append(f"🌐 Объявление с фото: {site_link}")
+         footer_parts.append(f"🌐 Объявление на сайте: {site_link}")
         if forwarded_from and not forwarded_from.startswith("@"):
             footer_parts.append(f"👤 Переслано от: {forwarded_from}")
         if post_link:
@@ -382,8 +382,9 @@ class VKUploader:
         full_message = (message or "") + "\n\n" + "🔸" * 10 + "\n" + "\n".join(footer_parts)
 
         if photo_urls:
-            print(f"📤 Загружаем {len(photo_urls)} фото...")
-            for index, photo_url in enumerate(photo_urls[:10], start=1):
+            attach_limit = 3  # хватит для ленты; остальные фото — на сайте. Бережём лимиты VK от Error 9
+            print(f"📤 Загружаем {min(len(photo_urls), attach_limit)} фото из {len(photo_urls)} (остальные — на сайте)...")
+            for index, photo_url in enumerate(photo_urls[:attach_limit], start=1):
                 if self.flood_blocked:
                     print("⛔ Error 9 во время загрузки — прекращаем работу с фото")
                     return None
