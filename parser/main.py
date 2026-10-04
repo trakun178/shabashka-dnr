@@ -37,7 +37,7 @@ SITE_BASE = "https://shabashka.sofoniya.ru"
 VK_MAX_PHOTO_BYTES = 5 * 1024 * 1024
 VK_POST_DELAY = 60  # пауза между VK-постами внутри одного запуска
 
-# Режим работы: публикуем ВСЕ посты запуска в VK, без дневного потолка.
+# Режим: публикуем ВСЕ посты запуска в VK, без дневного потолка.
 # Защита от Error 9: задержка между постами, fail-fast по девятке,
 # прогрессивная пауза 1/6/24 ч, кэш upload_url в аплоадере.
 
@@ -58,6 +58,10 @@ HEADERS = {
     "Content-Type": "application/json",
     "Prefer": "return=representation",
 }
+
+# Регекс телефонов: терпим к скобкам, дефисам, пробелам, точкам.
+# Примеры, которые ловит: +7(949)098-35-32, 8-949-300-77-58, +7 949 300 77 58
+PHONE_RE = re.compile(r"\+?\d(?:[ \-\(\)\.]?\d){9,14}")
 
 
 def mask_secret(text):
@@ -259,10 +263,44 @@ def extract_media(post):
 
 
 def extract_phone(text):
+    """Ищет телефон в тексте, терпим к скобкам, дефисам, пробелам и точкам.
+    Возвращает нормализованный вид: +79490983532."""
     if not text:
         return ""
-    phones = re.findall(r"\+?\d{10,15}", text)
-    return phones[0] if phones else ""
+    for m in PHONE_RE.finditer(text):
+        digits = re.sub(r"\D", "", m.group(0))
+        if len(digits) == 11 and digits[0] in ("7", "8"):
+            return "+7" + digits[1:]
+        if len(digits) == 10:
+            return "+7" + digits
+        if 11 <= len(digits) <= 15:
+            return "+" + digits
+    return ""
+
+
+def ocr_phone_from_url(url):
+    """Пытается вычитать телефон с фото через Tesseract OCR (фолбэк)."""
+    if not url:
+        return ""
+    try:
+        import pytesseract
+        from PIL import Image
+        import io as _io
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
+        if r.status_code != 200 or not r.content:
+            return ""
+        img = Image.open(_io.BytesIO(r.content))
+        txt = pytesseract.image_to_string(img, lang="rus+eng", config="--psm 6")
+        phone = extract_phone(txt)
+        if phone:
+            print(f"   🔎 OCR: найден телефон на фото: {phone}")
+        return phone
+    except ImportError:
+        # pytesseract не установлен в окружении — тихо продолжаем без OCR
+        return ""
+    except Exception as e:
+        print(f"   ⚠️ OCR не сработал: {e}")
+        return ""
 
 
 def parse_category(text):
@@ -482,13 +520,18 @@ def get_channel_updates():
                 final_photo_urls = photo_urls
             final_photo_url = final_photo_urls[0] if final_photo_urls else None
 
+            # Телефон: сначала в тексте, если нет — OCR первого фото
+            phone = extract_phone(combined_text)
+            if not phone and photo_urls:
+                phone = ocr_phone_from_url(photo_urls[0])
+
             new_ads.append({
                 "tg_message_id": message_id,
                 "title": smart_title(combined_text) if combined_text else f"Объявление #{message_id}",
                 "description": combined_text or "Объявление с медиа файлом",
                 "category": parse_category(combined_text),
                 "city": parse_city(combined_text),
-                "phone": extract_phone(combined_text),
+                "phone": phone,
                 "photo_url": final_photo_url,
                 "photo_urls": json.dumps(final_photo_urls),
                 "vk_post_url": vk_post_url,
@@ -554,13 +597,18 @@ def get_channel_updates():
                 final_photo_urls = photo_urls
             final_photo_url = final_photo_urls[0] if final_photo_urls else None
 
+            # Телефон: сначала в тексте, если нет — OCR первого фото
+            phone = extract_phone(text)
+            if not phone and photo_urls:
+                phone = ocr_phone_from_url(photo_urls[0])
+
             new_ads.append({
                 "tg_message_id": message_id,
                 "title": smart_title(text) if text else f"Объявление #{message_id}",
                 "description": text or "Объявление с медиа файлом",
                 "category": parse_category(text),
                 "city": parse_city(text),
-                "phone": extract_phone(text),
+                "phone": phone,
                 "photo_url": final_photo_url,
                 "photo_urls": json.dumps(final_photo_urls),
                 "vk_post_url": vk_post_url,
