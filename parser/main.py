@@ -626,7 +626,7 @@ def get_channel_updates():
         print(f"\n💾 Сохраняем {len(new_ads)} объявлений...")
         url = f"{SUPABASE_URL}/rest/v1/ads"
         headers_upsert = HEADERS.copy()
-        headers_upsert["Prefer"] = "resolution=ignore-duplicates,return=representation"
+        headers_upsert["Prefer"] = "resolution=merge-duplicates,return=representation"
         response = requests.post(url, headers=headers_upsert, json=new_ads)
 
         if response.status_code in [200, 201]:
